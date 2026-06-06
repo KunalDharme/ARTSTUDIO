@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="container form-section">
+  <div class="section-intro">
+    <h2>Edit media</h2>
+    <p>Update the title, description, or tags for this upload.</p>
+  </div>
+  <form action="/media/{{ media.id }}/edit" method="post" class="upload-form">
+    <label>
+      Title
+      <input type="text" name="title" value="{{ media.title }}" required />
+    </label>
+    <label>
+      Description
+      <textarea name="description" rows="4">{{ media.description or '' }}</textarea>
+    </label>
+    <label>
+      Tags
+      <input type="text" name="tags" value="{{ media.tags or '' }}" placeholder="Comma-separated tags" />
+    </label>
+    <button type="submit" class="button">Save changes</button>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="container form-section">
+  <div class="section-intro">
+    <h2>Create account</h2>
+  </div>
+  {% if error %}
+    <div style="color:#ffb3b3">{{ error }}</div>
+  {% endif %}
+  <form action="/register" method="post" class="upload-form">
+    <label>Username<input type="text" name="username" required/></label>
+    <label>Email<input type="email" name="email"/></label>
+    <label>Password<input type="password" name="password" required/></label>
+    <button type="submit" class="button">Register</button>
+  </form>
+</section>
+{% endblock %}

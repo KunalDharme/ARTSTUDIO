@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="container form-section">
+  <div class="section-intro">
+    <h2>Upload a photo or video</h2>
+    <p>Share professional media with your audience in seconds.</p>
+  </div>
+  <form action="/upload" method="post" enctype="multipart/form-data" class="upload-form">
+    <label>
+      Title
+      <input type="text" name="title" placeholder="Media title" required />
+    </label>
+    <label>
+      Description
+      <textarea name="description" rows="4" placeholder="Describe your photo or video"></textarea>
+    </label>
+    <label>
+      Tags
+      <input type="text" name="tags" placeholder="Comma-separated tags (e.g. travel, portrait)" />
+    </label>
+
+    <div class="file-drop-zone" id="dropZone">
+      <i class="fas fa-cloud-arrow-up" style="font-size:2rem;margin-bottom:8px;opacity:0.5"></i>
+      <p style="margin:0;font-weight:600">Drag & drop or click to choose file</p>
+      <p style="margin:4px 0 0;font-size:0.85rem;opacity:0.6">Images up to 50 MB · Videos up to 500 MB</p>
+      <input type="file" name="media_file" id="mediaFileInput" accept="image/*,video/mp4,video/webm" required style="position:absolute;inset:0;opacity:0;cursor:pointer" />
+    </div>
+
+    <!-- Preview area -->
+    <div id="filePreview" style="display:none;margin-top:12px;text-align:center">
+      <img id="previewImg" style="max-width:100%;max-height:300px;border-radius:12px;display:none" />
+      <video id="previewVideo" controls style="max-width:100%;max-height:300px;border-radius:12px;display:none"></video>
+      <p id="previewName" style="font-size:0.85rem;opacity:0.7;margin-top:6px"></p>
+    </div>
+
+    <button type="submit" class="button" style="margin-top:8px">Upload</button>
+  </form>
+</section>
+
+<script>
+const input = document.getElementById('mediaFileInput');
+const dropZone = document.getElementById('dropZone');
+const preview = document.getElementById('filePreview');
+const previewImg = document.getElementById('previewImg');
+const previewVideo = document.getElementById('previewVideo');
+const previewName = document.getElementById('previewName');
+
+function showPreview(file) {
+  preview.style.display = 'block';
+  previewName.textContent = file.name + ' (' + (file.size / 1024 / 1024).toFixed(1) + ' MB)';
+  const url = URL.createObjectURL(file);
+  if (file.type.startsWith('video/')) {
+    previewImg.style.display = 'none';
+    previewVideo.style.display = 'block';
+    previewVideo.src = url;
+  } else {
+    previewVideo.style.display = 'none';
+    previewImg.style.display = 'block';
+    previewImg.src = url;
+  }
+}
+
+input.addEventListener('change', function() {
+  if (this.files[0]) showPreview(this.files[0]);
+});
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) { input.files = e.dataTransfer.files; showPreview(file); }
+});
+</script>
+{% endblock %}

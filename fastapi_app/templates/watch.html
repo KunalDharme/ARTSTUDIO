@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="container watch-page">
+  <div class="watch-grid">
+    <div class="preview-panel">
+      {% if media.media_type == 'video' %}
+        <video controls src="/uploads/{{ media.filename }}" class="media-player"></video>
+      {% else %}
+        <img src="/uploads/{{ media.filename }}" alt="{{ media.title }}" class="media-player" />
+      {% endif %}
+    </div>
+    <div class="watch-details">
+      <h1>{{ media.title }}</h1>
+      <p class="meta">Uploaded by {{ media.uploader }} · {{ media.created_at.strftime('%b %d, %Y') }} · {{ media.views }} views</p>
+      {% if media.tags %}
+        <p class="tag-list">#{{ media.tags.replace(', ', ' #')|replace(',', ' #') }}</p>
+      {% endif %}
+      <p>{{ media.description or 'No description available for this item.' }}</p>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+        <button id="likeBtn" class="button">{% if user_liked %}Unlike{% else %}Like{% endif %}</button>
+        <span id="likesCount">{{ likes }} likes</span>
+        {% if current_user %}
+        <button id="saveBtn" class="button save-btn{% if user_saved %} saved{% endif %}" data-id="{{ media.id }}" title="{% if user_saved %}Unsave{% else %}Save{% endif %}" style="margin-left:8px">
+          <i class="fa{% if user_saved %}s{% else %}r{% endif %} fa-bookmark"></i>
+          <span id="saveBtnLabel">{% if user_saved %}Saved{% else %}Save{% endif %}</span>
+        </button>
+        {% endif %}
+      </div>
+      <a class="button" href="/browse">Browse more media</a>
+    </div>
+  </div>
+
+  {% if related_media %}
+  <section class="container section-grid" style="margin-top:2rem">
+    <div class="section-intro">
+      <h3>Related media</h3>
+      <p>More photos and videos viewers are watching.</p>
+    </div>
+    <div class="media-grid">
+      {% for item in related_media %}
+        <article class="media-card">
+          {% if item.media_type == 'video' %}
+            <div class="media-thumbnail video-thumb">
+              <i class="fas fa-play"></i>
+              <video muted>
+                <source src="/uploads/{{ item.filename }}" type="video/mp4" />
+              </video>
+            </div>
+          {% else %}
+            <img src="/uploads/{{ item.filename }}" alt="{{ item.title }}" />
+          {% endif %}
+          <div class="media-meta">
+            <a href="/watch/{{ item.id }}"><h3>{{ item.title }}</h3></a>
+            <p>{{ item.uploader }} · {{ item.views }} views</p>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <div class="comments-section container" style="margin-top:2rem">
+    <h3>Comments</h3>
+    <form action="/comment" method="post" style="margin-bottom:1rem">
+      <input type="hidden" name="media_id" value="{{ media.id }}" />
+      <textarea name="text" rows="3" placeholder="Add a comment..." required style="width:100%;padding:8px;border-radius:8px;margin-bottom:8px"></textarea>
+      <button type="submit" class="button">Post comment</button>
+    </form>
+
+    {% if comments %}
+      {% for c in comments %}
+        <div class="comment" style="padding:12px;border-radius:8px;background:var(--surface-2);margin-bottom:8px">
+          <strong>{{ c.name }}</strong> · <small>{{ c.created_at.strftime('%b %d, %Y %H:%M') }}</small>
+          <p style="margin:6px 0">{{ c.text }}</p>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p>No comments yet.</p>
+    {% endif %}
+  </div>
+
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  const likeBtn = document.getElementById('likeBtn');
+  if(likeBtn){
+    likeBtn.addEventListener('click', async function(){
+      const resp = await fetch('/like/{{ media.id }}', { method: 'POST', credentials: 'same-origin' });
+      if(!resp.ok){
+        alert('Login required to like this media.');
+        return;
+      }
+      const data = await resp.json();
+      document.getElementById('likesCount').textContent = data.likes + ' likes';
+      likeBtn.textContent = data.liked ? 'Unlike' : 'Like';
+    });
+  }
+
+  const saveBtn = document.getElementById('saveBtn');
+  if(saveBtn){
+    saveBtn.addEventListener('click', async function(){
+      const resp = await fetch('/save/{{ media.id }}', { method: 'POST', credentials: 'same-origin' });
+      if(!resp.ok){ alert('Login required to save.'); return; }
+      const data = await resp.json();
+      const icon = saveBtn.querySelector('i');
+      const label = document.getElementById('saveBtnLabel');
+      if(data.saved){
+        saveBtn.classList.add('saved');
+        icon.className = 'fas fa-bookmark';
+        label.textContent = 'Saved';
+        saveBtn.title = 'Unsave';
+      } else {
+        saveBtn.classList.remove('saved');
+        icon.className = 'far fa-bookmark';
+        label.textContent = 'Save';
+        saveBtn.title = 'Save';
+      }
+    });
+  }
+});
+</script>
+{% endblock %}

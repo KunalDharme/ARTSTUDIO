@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="container">
+  <div class="section-intro">
+    <h2>Admin Dashboard</h2>
+  </div>
+
+  <!-- Stats Bar -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:1rem;margin-bottom:2rem">
+    <div style="background:var(--surface-2);border-radius:12px;padding:1rem;text-align:center">
+      <div style="font-size:1.8rem;font-weight:700">{{ stats.total_users }}</div>
+      <div style="font-size:0.8rem;opacity:0.7">Users</div>
+    </div>
+    <div style="background:var(--surface-2);border-radius:12px;padding:1rem;text-align:center">
+      <div style="font-size:1.8rem;font-weight:700">{{ stats.total_media }}</div>
+      <div style="font-size:0.8rem;opacity:0.7">Uploads</div>
+    </div>
+    <div style="background:var(--surface-2);border-radius:12px;padding:1rem;text-align:center">
+      <div style="font-size:1.8rem;font-weight:700">{{ stats.total_posts }}</div>
+      <div style="font-size:0.8rem;opacity:0.7">Posts</div>
+    </div>
+    <div style="background:var(--surface-2);border-radius:12px;padding:1rem;text-align:center">
+      <div style="font-size:1.8rem;font-weight:700">{{ stats.total_comments }}</div>
+      <div style="font-size:0.8rem;opacity:0.7">Comments</div>
+    </div>
+    <div style="background:var(--surface-2);border-radius:12px;padding:1rem;text-align:center">
+      <div style="font-size:1.8rem;font-weight:700">{{ stats.total_likes }}</div>
+      <div style="font-size:0.8rem;opacity:0.7">Likes</div>
+    </div>
+    <div style="background:var(--surface-2);border-radius:12px;padding:1rem;text-align:center">
+      <div style="font-size:1.8rem;font-weight:700;color:#e53e3e">{{ stats.banned_users }}</div>
+      <div style="font-size:0.8rem;opacity:0.7">Banned</div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div style="display:flex;gap:8px;margin-bottom:1.5rem;border-bottom:2px solid var(--surface-2);padding-bottom:8px">
+    {% for t, label in [('users','Users'), ('media','Media'), ('posts','Posts'), ('comments','Comments')] %}
+      <a href="/admin?tab={{ t }}" style="padding:6px 16px;border-radius:8px 8px 0 0;text-decoration:none;font-weight:600;
+        {% if tab == t %}background:var(--accent);color:#fff{% else %}color:var(--text-muted){% endif %}">
+        {{ label }}
+      </a>
+    {% endfor %}
+  </div>
+
+  <!-- Users Tab -->
+  {% if tab == 'users' %}
+  <form method="get" action="/admin" class="search-form" style="margin-bottom:1rem;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <input type="hidden" name="tab" value="users"/>
+    <input type="text" name="q" value="{{ q }}" placeholder="Search username" style="padding:6px 10px;border-radius:8px;border:1px solid var(--surface-2)"/>
+    <select name="is_admin" style="padding:6px 10px;border-radius:8px;border:1px solid var(--surface-2)">
+      <option value="" {% if is_admin == '' %}selected{% endif %}>Any role</option>
+      <option value="1" {% if is_admin in ('1','true') %}selected{% endif %}>Admin only</option>
+      <option value="0" {% if is_admin in ('0','false') %}selected{% endif %}>Non-admin only</option>
+    </select>
+    <button type="submit" class="button">Filter</button>
+  </form>
+  <table style="width:100%;border-collapse:collapse">
+    <thead>
+      <tr style="border-bottom:2px solid var(--surface-2)">
+        <th style="padding:8px;text-align:left">Username</th>
+        <th style="padding:8px;text-align:left">Email</th>
+        <th style="padding:8px;text-align:left">Role</th>
+        <th style="padding:8px;text-align:left">Status</th>
+        <th style="padding:8px;text-align:left">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+      <tr style="border-bottom:1px solid var(--surface-2){% if u.is_banned %};opacity:0.6{% endif %}">
+        <td style="padding:8px"><a href="/profile/{{ u.username }}">{{ u.username }}</a></td>
+        <td style="padding:8px">{{ u.email or '—' }}</td>
+        <td style="padding:8px">{{ 'Admin' if u.is_admin else 'User' }}</td>
+        <td style="padding:8px">
+          {% if u.is_banned %}
+            <span style="color:#e53e3e;font-weight:600">Banned</span>
+          {% else %}
+            <span style="color:#38a169;font-weight:600">Active</span>
+          {% endif %}
+        </td>
+        <td style="padding:8px;display:flex;gap:6px;flex-wrap:wrap">
+          <form action="/admin/user/{{ u.username }}/promote" method="post" style="display:inline">
+            <input type="hidden" name="make_admin" value="{{ '0' if u.is_admin else '1' }}"/>
+            <button type="submit" class="button" style="font-size:0.8rem;padding:4px 10px">
+              {{ 'Revoke Admin' if u.is_admin else 'Make Admin' }}
+            </button>
+          </form>
+          {% if not u.is_admin %}
+          <form action="/admin/user/{{ u.username }}/ban" method="post" style="display:inline"
+                onsubmit="return confirm('{{ 'Unban' if u.is_banned else 'Ban' }} {{ u.username }}?')">
+            <input type="hidden" name="action" value="{{ 'unban' if u.is_banned else 'ban' }}"/>
+            <button type="submit" class="button {% if not u.is_banned %}button-danger{% endif %}" style="font-size:0.8rem;padding:4px 10px">
+              {{ 'Unban' if u.is_banned else 'Ban' }}
+            </button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  <!-- Media Tab -->
+  {% if tab == 'media' %}
+  <p style="opacity:0.7;margin-bottom:1rem">{{ media_total }} total uploads</p>
+  <table style="width:100%;border-collapse:collapse">
+    <thead>
+      <tr style="border-bottom:2px solid var(--surface-2)">
+        <th style="padding:8px;text-align:left">ID</th>
+        <th style="padding:8px;text-align:left">Title</th>
+        <th style="padding:8px;text-align:left">Uploader</th>
+        <th style="padding:8px;text-align:left">Type</th>
+        <th style="padding:8px;text-align:left">Views</th>
+        <th style="padding:8px;text-align:left">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in media_items %}
+      <tr style="border-bottom:1px solid var(--surface-2)">
+        <td style="padding:8px">{{ item.id }}</td>
+        <td style="padding:8px"><a href="/watch/{{ item.id }}">{{ item.title[:40] }}{% if item.title|length > 40 %}…{% endif %}</a></td>
+        <td style="padding:8px"><a href="/profile/{{ item.uploader }}">{{ item.uploader }}</a></td>
+        <td style="padding:8px">{{ item.media_type }}</td>
+        <td style="padding:8px">{{ item.views }}</td>
+        <td style="padding:8px">
+          <form action="/admin/media/{{ item.id }}/delete" method="post" style="display:inline"
+                onsubmit="return confirm('Delete this media item permanently?')">
+            <button type="submit" class="button button-danger" style="font-size:0.8rem;padding:4px 10px">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  <!-- Posts Tab -->
+  {% if tab == 'posts' %}
+  <p style="opacity:0.7;margin-bottom:1rem">{{ posts_total }} total posts</p>
+  <table style="width:100%;border-collapse:collapse">
+    <thead>
+      <tr style="border-bottom:2px solid var(--surface-2)">
+        <th style="padding:8px;text-align:left">ID</th>
+        <th style="padding:8px;text-align:left">Title</th>
+        <th style="padding:8px;text-align:left">Author</th>
+        <th style="padding:8px;text-align:left">Published</th>
+        <th style="padding:8px;text-align:left">Date</th>
+        <th style="padding:8px;text-align:left">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in posts %}
+      <tr style="border-bottom:1px solid var(--surface-2)">
+        <td style="padding:8px">{{ p.id }}</td>
+        <td style="padding:8px"><a href="/post/{{ p.id }}">{{ p.title[:40] }}{% if p.title|length > 40 %}…{% endif %}</a></td>
+        <td style="padding:8px"><a href="/profile/{{ p.author }}">{{ p.author }}</a></td>
+        <td style="padding:8px">{{ 'Yes' if p.published else 'Draft' }}</td>
+        <td style="padding:8px">{{ p.created_at.strftime('%Y-%m-%d') }}</td>
+        <td style="padding:8px">
+          <form action="/admin/post/{{ p.id }}/delete" method="post" style="display:inline"
+                onsubmit="return confirm('Delete this post permanently?')">
+            <button type="submit" class="button button-danger" style="font-size:0.8rem;padding:4px 10px">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  <!-- Comments Tab -->
+  {% if tab == 'comments' %}
+  <p style="opacity:0.7;margin-bottom:1rem">{{ comments_total }} total comments</p>
+  <table style="width:100%;border-collapse:collapse">
+    <thead>
+      <tr style="border-bottom:2px solid var(--surface-2)">
+        <th style="padding:8px;text-align:left">Author</th>
+        <th style="padding:8px;text-align:left">Comment</th>
+        <th style="padding:8px;text-align:left">Media</th>
+        <th style="padding:8px;text-align:left">Date</th>
+        <th style="padding:8px;text-align:left">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in comments %}
+      <tr style="border-bottom:1px solid var(--surface-2)">
+        <td style="padding:8px">{{ c.name }}</td>
+        <td style="padding:8px">{{ c.text[:60] }}{% if c.text|length > 60 %}…{% endif %}</td>
+        <td style="padding:8px"><a href="/watch/{{ c.media_id }}">#{{ c.media_id }}</a></td>
+        <td style="padding:8px">{{ c.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td style="padding:8px">
+          <form action="/admin/comment/{{ c.id }}/delete" method="post" style="display:inline"
+                onsubmit="return confirm('Delete this comment?')">
+            <button type="submit" class="button button-danger" style="font-size:0.8rem;padding:4px 10px">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+</section>
+{% endblock %}

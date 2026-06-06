@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="container">
+  <div class="section-intro"><h2>Your Feed</h2></div>
+  {% if posts %}
+    <div class="posts-list">
+      {% for p in posts %}
+        <article class="post-card">
+          <h3><a href="/post/{{ p.id }}">{{ p.title }}</a></h3>
+          <div class="meta">By {{ p.author }} on {{ p.created_at.strftime('%Y-%m-%d') }}</div>
+          <p>{{ p.content[:200] }}{% if p.content|length > 200 %}...{% endif %}</p>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p>No posts to show — follow some users to populate your feed.</p>
+  {% endif %}
+
+  {% if suggestions %}
+  <section class="container section-grid">
+    <div class="section-intro">
+      <h2>Creators to follow</h2>
+      <p>Grow your feed by discovering active artists and fans.</p>
+    </div>
+    <div class="user-grid">
+      {% for item in suggestions %}
+      <article class="user-card">
+        <div class="user-card-top">
+          <div class="user-avatar">{{ item.username[0] }}</div>
+          <div>
+            <a href="/profile/{{ item.username }}"><h3>{{ item.username }}</h3></a>
+            <p>{{ item.bio or 'Creative portfolio and fan favorite.' }}</p>
+          </div>
+        </div>
+        <div class="user-card-meta">
+          <span>{{ item.followers }} followers</span>
+          <a class="button button-secondary" href="/profile/{{ item.username }}">View profile</a>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+</section>
+{% endblock %}

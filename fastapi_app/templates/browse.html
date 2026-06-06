@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="container section-grid search-section">
+  <div class="section-intro">
+    <h2>Browse media</h2>
+    <p>Search by title, description, uploader, or tags.</p>
+  </div>
+  <form class="search-form" action="/browse" method="get">
+    <input type="text" name="q" value="{{ search }}" placeholder="Search media..." />
+    <input type="text" name="tag" value="{{ tag }}" placeholder="Filter by tag..." />
+    <select name="sort">
+      <option value="newest" {% if sort == 'newest' %}selected{% endif %}>Newest</option>
+      <option value="popular" {% if sort == 'popular' %}selected{% endif %}>Most viewed</option>
+      <option value="oldest" {% if sort == 'oldest' %}selected{% endif %}>Oldest</option>
+    </select>
+    <button type="submit">Search</button>
+  </form>
+  {% if total_results is not none %}
+    <p class="search-summary">Showing {{ media_items|length }} of {{ total_results }} results</p>
+  {% endif %}
+</section>
+
+<section class="container media-grid">
+  {% if media_items %}
+    {% for media in media_items %}
+      <article class="media-card">
+        {% if media.media_type == 'video' %}
+          <div class="media-thumbnail video-thumb">
+            <i class="fas fa-play"></i>
+            <video muted>
+              <source src="/uploads/{{ media.filename }}" type="video/mp4" />
+            </video>
+          </div>
+        {% else %}
+          <img src="/uploads/{{ media.filename }}" alt="{{ media.title }}" />
+        {% endif %}
+        <div class="media-meta">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+            <a href="/watch/{{ media.id }}"><h3>{{ media.title }}</h3></a>
+            {% if current_user %}
+            <div style="display:flex;gap:4px;flex-shrink:0">
+              <button class="card-like-btn{% if media.id in liked_ids %} liked{% endif %}" data-id="{{ media.id }}" title="Like">
+                <i class="fa{% if media.id in liked_ids %}s{% else %}r{% endif %} fa-heart"></i>
+              </button>
+              <button class="save-btn{% if media.id in saved_ids %} saved{% endif %}" data-id="{{ media.id }}" title="Save">
+                <i class="fa{% if media.id in saved_ids %}s{% else %}r{% endif %} fa-bookmark"></i>
+              </button>
+            </div>
+            {% endif %}
+          </div>
+          {% if media.tags %}
+            <div class="tag-list">#{{ media.tags.replace(', ', ' #')|replace(',', ' #') }}</div>
+          {% endif %}
+          <p>{{ media.description or 'No description provided.' }}</p>
+          <span><a href="/profile/{{ media.uploader }}" class="uploader-link">{{ media.uploader }}</a> · {{ media.views }} views</span>
+        </div>
+      </article>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state">
+      <p>No media found. Try uploading a new photo or video.</p>
+      <a class="button" href="/upload">Upload media</a>
+    </div>
+  {% endif %}
+</section>
+
+{% if page_count and page_count > 1 %}
+  <nav class="pagination-container">
+    <div class="pagination">
+      {% if page > 1 %}
+        <a href="/browse?q={{ search }}&tag={{ tag }}&sort={{ sort }}&page={{ page - 1 }}">← Previous</a>
+      {% endif %}
+      <span>Page {{ page }} of {{ page_count }}</span>
+      {% if page < page_count %}
+        <a href="/browse?q={{ search }}&tag={{ tag }}&sort={{ sort }}&page={{ page + 1 }}">Next →</a>
+      {% endif %}
+    </div>
+  </nav>
+{% endif %}
+
+<script>
+document.querySelectorAll('.card-like-btn').forEach(btn => {
+  btn.addEventListener('click', async function() {
+    const id = this.dataset.id;
+    const resp = await fetch('/like/' + id, { method: 'POST', credentials: 'same-origin' });
+    if (!resp.ok) { alert('Sign in to like media.'); return; }
+    const data = await resp.json();
+    const icon = this.querySelector('i');
+    if (data.liked) { this.classList.add('liked'); icon.className = 'fas fa-heart'; }
+    else { this.classList.remove('liked'); icon.className = 'far fa-heart'; }
+  });
+});
+document.querySelectorAll('.save-btn').forEach(btn => {
+  btn.addEventListener('click', async function(e) {
+    e.preventDefault();
+    const id = this.dataset.id;
+    const resp = await fetch('/save/' + id, { method: 'POST', credentials: 'same-origin' });
+    if (!resp.ok) { alert('Login required to save.'); return; }
+    const data = await resp.json();
+    const icon = this.querySelector('i');
+    if (data.saved) { this.classList.add('saved'); icon.className = 'fas fa-bookmark'; this.title = 'Unsave'; }
+    else { this.classList.remove('saved'); icon.className = 'far fa-bookmark'; this.title = 'Save'; }
+  });
+});
+</script>
+{% endblock %}

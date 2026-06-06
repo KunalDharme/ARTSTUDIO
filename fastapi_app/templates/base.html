@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ArtStudio Media Gallery</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha512-..." crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="/static/css/main.css?v=20250603" />
+  <script>
+    (function() {
+      const themeStorageKey = 'artstudio-theme';
+      const savedTheme = localStorage.getItem(themeStorageKey);
+      const initialTheme = savedTheme === 'dark' || savedTheme === 'light'
+        ? savedTheme
+        : window.matchMedia('(prefers-color-scheme: dark)').matches
+          ? 'dark'
+          : 'light';
+      document.documentElement.setAttribute('data-theme', initialTheme);
+      if (document.body) {
+        document.body.setAttribute('data-theme', initialTheme);
+      }
+    })();
+  </script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container nav-bar">
+      <a class="brand" href="/">ArtStudio</a>
+      <div class="nav-actions">
+        <button class="theme-toggle" type="button" aria-label="Toggle dark light theme">
+          <i class="fas fa-moon"></i>
+          <span class="theme-toggle-label">Dark mode</span>
+        </button>
+      </div>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/explore"><i class="fas fa-magnifying-glass" style="margin-right:4px"></i>Explore</a>
+        <a href="/feed">Feed</a>
+        <a href="/upload">Upload</a>
+        {% if current_user %}
+          <a href="/dashboard">Dashboard</a>
+          <a href="/profile/{{ current_user.username }}">Hi, {{ current_user.username }}</a>
+          <button class="settings-trigger" id="settingsTrigger" aria-label="Settings" title="Settings">
+            <i class="fas fa-gear"></i>
+          </button>
+          <button class="notif-trigger" id="notifTrigger" aria-label="Notifications" title="Notifications">
+            <i class="fas fa-bell"></i>
+            {% if unread_notifications > 0 %}
+            <span class="notif-badge" id="notifBadge">{{ unread_notifications }}</span>
+            {% else %}
+            <span class="notif-badge" id="notifBadge" style="display:none">0</span>
+            {% endif %}
+          </button>
+          <a href="/logout" id="logoutLink">Logout</a>
+        {% else %}
+          <a href="/login">Sign in</a>
+          <a href="/register">Register</a>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+
+  <main class="page-content">
+    {% if flash %}
+    <div class="flash flash-{{ flash.cat }}" role="alert" id="flashBanner">
+      <span>{{ flash.msg }}</span>
+      <button class="flash-close" onclick="this.parentElement.remove()" aria-label="Dismiss">✕</button>
+    </div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="/">ArtStudio</a>
+        <p>A creative gallery for sharing photos, videos, and visual stories. Upload your work, connect with an audience, and curate your artistic portfolio.</p>
+        <div class="footer-social">
+          <a href="#" aria-label="Twitter"><i class="fab fa-x-twitter"></i></a>
+          <a href="#" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
+          <a href="#" aria-label="GitHub"><i class="fab fa-github"></i></a>
+        </div>
+      </div>
+      <div class="footer-links">
+        <div>
+          <h4>Discover</h4>
+          <a href="/explore">Explore</a>
+          <a href="/feed">Feed</a>
+          <a href="/upload">Upload</a>
+        </div>
+        <div>
+          <h4>Account</h4>
+          {% if current_user %}
+            <a href="/dashboard">Dashboard</a>
+            <a href="/profile/{{ current_user.username }}">Profile</a>
+            <a href="/logout">Sign out</a>
+          {% else %}
+            <a href="/login">Sign in</a>
+            <a href="/register">Register</a>
+          {% endif %}
+        </div>
+        <div>
+          <h4>About</h4>
+          <a href="#">About us</a>
+          <a href="#">Privacy</a>
+          <a href="#">Terms</a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>© {{ 2025 }} ArtStudio. Built with FastAPI &amp; passion for creative work.</p>
+    </div>
+  </footer>
+
+  {% if current_user %}
+  <!-- Settings overlay -->
+  <div class="settings-overlay" id="settingsOverlay"></div>
+
+  <!-- Settings panel -->
+  <aside class="settings-panel" id="settingsPanel" aria-label="Settings panel">
+    <div class="settings-panel-header">
+      <h2>Settings</h2>
+      <button class="settings-close" id="settingsClose" aria-label="Close settings"><i class="fas fa-xmark"></i></button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="settings-tabs">
+      <button class="settings-tab active" data-tab="account">Account</button>
+      <button class="settings-tab" data-tab="security">Security</button>
+      <button class="settings-tab" data-tab="danger">Danger Zone</button>
+    </div>
+
+    <!-- Account Tab -->
+    <div class="settings-body" id="tab-account">
+      <p class="settings-section-label">Change Email</p>
+      <form action="/settings/email" method="post" class="settings-form" id="emailForm">
+        <div class="settings-field">
+          <label>Current email</label>
+          <input type="text" value="{{ current_user.email or 'Not set' }}" disabled />
+        </div>
+        <div class="settings-field">
+          <label>New email</label>
+          <input type="email" name="email" required placeholder="you@example.com" />
+        </div>
+        <div class="settings-field">
+          <label>Confirm password</label>
+          <input type="password" name="password" required placeholder="Your current password" />
+        </div>
+        <button type="submit" class="button settings-submit">Update Email</button>
+        <p class="settings-feedback" id="emailFeedback"></p>
+      </form>
+
+      <hr class="settings-divider"/>
+
+      <p class="settings-section-label">Profile</p>
+      <div class="settings-links">
+        <a href="/profile/{{ current_user.username }}/edit" class="button settings-link-btn">
+          <i class="fas fa-user-pen"></i> Edit Profile & Avatar
+        </a>
+        {% if current_user.is_admin %}
+        <a href="/admin" class="button settings-link-btn">
+          <i class="fas fa-shield-halved"></i> Admin Dashboard
+        </a>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Security Tab -->
+    <div class="settings-body" id="tab-security" style="display:none">
+      <p class="settings-section-label">Change Password</p>
+      <form action="/settings/password" method="post" class="settings-form" id="passwordForm">
+        <div class="settings-field">
+          <label>Current password</label>
+          <input type="password" name="current_password" required placeholder="Current password" />
+        </div>
+        <div class="settings-field">
+          <label>New password</label>
+          <input type="password" name="new_password" required placeholder="Min 8 characters" minlength="8" id="newPwdInput"/>
+          <div class="pwd-strength-bar"><div class="pwd-strength-fill" id="pwdStrengthFill"></div></div>
+          <small class="pwd-strength-label" id="pwdStrengthLabel"></small>
+        </div>
+        <div class="settings-field">
+          <label>Confirm new password</label>
+          <input type="password" name="confirm_password" required placeholder="Repeat new password" id="confirmPwdInput"/>
+          <small class="pwd-match-label" id="pwdMatchLabel"></small>
+        </div>
+        <button type="submit" class="button settings-submit" id="pwdSubmitBtn">Update Password</button>
+        <p class="settings-feedback" id="passwordFeedback"></p>
+      </form>
+    </div>
+
+    <!-- Danger Zone Tab -->
+    <div class="settings-body" id="tab-danger" style="display:none">
+      <p class="settings-section-label" style="color:#e53e3e">Danger Zone</p>
+      <p style="font-size:0.9rem;opacity:0.8;margin-bottom:1rem">These actions are permanent and cannot be undone.</p>
+
+      <div style="background:#fff1f0;border:1px solid #feb2b2;border-radius:10px;padding:1rem;margin-bottom:1rem">
+        <p style="font-weight:600;margin-bottom:6px;color:#c53030">Delete My Account</p>
+        <p style="font-size:0.85rem;margin-bottom:12px;color:#742a2a">
+          All your uploads, posts, comments, and likes will be permanently deleted.
+        </p>
+        <button type="button" class="button button-danger" id="deleteAccountBtn">
+          <i class="fas fa-trash"></i> Delete My Account
+        </button>
+      </div>
+
+      <!-- Confirm delete modal inside panel -->
+      <div id="deleteConfirmBox" style="display:none;background:var(--surface-2);border-radius:10px;padding:1rem">
+        <p style="font-weight:600;margin-bottom:8px">Type <strong>DELETE</strong> to confirm:</p>
+        <form action="/settings/delete-account" method="post" class="settings-form" id="deleteAccountForm">
+          <div class="settings-field">
+            <input type="text" id="deleteConfirmInput" name="confirm_text" placeholder="Type DELETE" autocomplete="off"/>
+          </div>
+          <div class="settings-field">
+            <label>Your password</label>
+            <input type="password" name="password" required placeholder="Current password"/>
+          </div>
+          <button type="submit" class="button button-danger" id="deleteSubmitBtn" disabled>Permanently Delete</button>
+          <button type="button" class="button" id="cancelDeleteBtn" style="margin-left:8px">Cancel</button>
+        </form>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Notification panel -->
+  <aside class="settings-panel notif-panel" id="notifPanel" aria-label="Notifications">
+    <div class="settings-panel-header">
+      <h2>Notifications</h2>
+      <button class="settings-close" id="notifClose" aria-label="Close"><i class="fas fa-xmark"></i></button>
+    </div>
+    <div id="notifList" style="overflow-y:auto;flex:1;padding:0">
+      <div style="padding:2rem;text-align:center;opacity:0.5">Loading…</div>
+    </div>
+  </aside>
+
+  <script>
+  (function(){
+    const trigger = document.getElementById('settingsTrigger');
+    const panel   = document.getElementById('settingsPanel');
+    const overlay = document.getElementById('settingsOverlay');
+    const closeBtn= document.getElementById('settingsClose');
+
+    function open(){ panel.classList.add('open'); overlay.classList.add('open'); document.body.style.overflow='hidden'; }
+    function close(){ panel.classList.remove('open'); overlay.classList.remove('open'); document.body.style.overflow=''; }
+
+    trigger.addEventListener('click', open);
+    closeBtn.addEventListener('click', close);
+    overlay.addEventListener('click', close);
+    document.addEventListener('keydown', e => { if(e.key==='Escape') close(); });
+
+    // Tabs
+    document.querySelectorAll('.settings-tab').forEach(btn => {
+      btn.addEventListener('click', function(){
+        document.querySelectorAll('.settings-tab').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.settings-body').forEach(b => b.style.display='none');
+        this.classList.add('active');
+        document.getElementById('tab-' + this.dataset.tab).style.display='block';
+      });
+    });
+
+    // Password strength
+    const newPwd = document.getElementById('newPwdInput');
+    const fill   = document.getElementById('pwdStrengthFill');
+    const label  = document.getElementById('pwdStrengthLabel');
+    const confirmPwd = document.getElementById('confirmPwdInput');
+    const matchLabel = document.getElementById('pwdMatchLabel');
+    const submitBtn  = document.getElementById('pwdSubmitBtn');
+
+    function pwdStrength(p){
+      let score = 0;
+      if(p.length >= 8)  score++;
+      if(p.length >= 12) score++;
+      if(/[A-Z]/.test(p)) score++;
+      if(/[0-9]/.test(p)) score++;
+      if(/[^A-Za-z0-9]/.test(p)) score++;
+      return score;
+    }
+
+    if(newPwd){
+      newPwd.addEventListener('input', function(){
+        const s = pwdStrength(this.value);
+        const pct = (s/5)*100;
+        fill.style.width = pct + '%';
+        fill.style.background = s<=1?'#e53e3e':s<=3?'#d69e2e':'#38a169';
+        label.textContent = s<=1?'Weak':s<=3?'Fair':'Strong';
+        checkMatch();
+      });
+      confirmPwd.addEventListener('input', checkMatch);
+    }
+
+    function checkMatch(){
+      if(!confirmPwd.value){ matchLabel.textContent=''; return; }
+      const ok = newPwd.value === confirmPwd.value;
+      matchLabel.textContent = ok ? '✓ Passwords match' : '✗ Passwords do not match';
+      matchLabel.style.color = ok ? '#38a169' : '#e53e3e';
+      submitBtn.disabled = !ok;
+    }
+
+    // AJAX form submissions
+    function ajaxForm(formId, feedbackId){
+      const form = document.getElementById(formId);
+      const feedback = document.getElementById(feedbackId);
+      if(!form) return;
+      form.addEventListener('submit', async function(e){
+        e.preventDefault();
+        feedback.textContent = '';
+        const btn = form.querySelector('button[type=submit]');
+        btn.disabled = true;
+        btn.textContent = 'Saving…';
+        try {
+          const resp = await fetch(form.action, { method:'POST', body: new FormData(form), credentials:'same-origin' });
+          const data = await resp.json();
+          feedback.textContent = data.message || (resp.ok ? 'Saved!' : 'Error');
+          feedback.style.color = resp.ok ? '#38a169' : '#e53e3e';
+        } catch(err){
+          feedback.textContent = 'Network error';
+          feedback.style.color = '#e53e3e';
+        }
+        btn.disabled = false;
+        btn.textContent = formId === 'emailForm' ? 'Update Email' : 'Update Password';
+      });
+    }
+
+    ajaxForm('emailForm', 'emailFeedback');
+    ajaxForm('passwordForm', 'passwordFeedback');
+
+    // Delete account confirm
+    const deleteAccountBtn = document.getElementById('deleteAccountBtn');
+    const deleteConfirmBox = document.getElementById('deleteConfirmBox');
+    const deleteConfirmInput = document.getElementById('deleteConfirmInput');
+    const deleteSubmitBtn = document.getElementById('deleteSubmitBtn');
+    const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+
+    if(deleteAccountBtn){
+      deleteAccountBtn.addEventListener('click', () => { deleteConfirmBox.style.display='block'; deleteAccountBtn.style.display='none'; });
+      cancelDeleteBtn.addEventListener('click', () => { deleteConfirmBox.style.display='none'; deleteAccountBtn.style.display='block'; deleteConfirmInput.value=''; deleteSubmitBtn.disabled=true; });
+      deleteConfirmInput.addEventListener('input', function(){ deleteSubmitBtn.disabled = this.value !== 'DELETE'; });
+    }
+  })();
+  </script>
+  {% endif %}
+
+  <script src="/static/js/theme-toggle.js?v=20250603" defer></script>
+  <script>
+    // ── Logout confirmation ──
+    const logoutLink = document.getElementById('logoutLink');
+    if (logoutLink) {
+      logoutLink.addEventListener('click', function(e) {
+        e.preventDefault();
+        if (confirm('Are you sure you want to sign out?')) {
+          window.location.href = this.href;
+        }
+      });
+    }
+
+    // ── Notification panel ──
+    const notifTrigger = document.getElementById('notifTrigger');
+    const notifPanel   = document.getElementById('notifPanel');
+    const notifClose   = document.getElementById('notifClose');
+    const notifBadge   = document.getElementById('notifBadge');
+    const settingsOverlay = document.getElementById('settingsOverlay');
+
+    function kindIcon(kind) {
+      if (kind === 'follow')  return '<i class="fas fa-user-plus" style="color:#4299e1"></i>';
+      if (kind === 'like')    return '<i class="fas fa-heart" style="color:#e53e3e"></i>';
+      if (kind === 'comment') return '<i class="fas fa-comment" style="color:#38a169"></i>';
+      return '<i class="fas fa-bell"></i>';
+    }
+
+    function kindText(n) {
+      if (n.kind === 'follow')  return `<strong>${n.actor}</strong> started following you`;
+      if (n.kind === 'like')    return `<strong>${n.actor}</strong> liked <em>${n.media_title || 'your media'}</em>`;
+      if (n.kind === 'comment') return `<strong>${n.actor}</strong> commented on <em>${n.media_title || 'your media'}</em>`;
+      return `<strong>${n.actor}</strong> did something`;
+    }
+
+    async function loadNotifications() {
+      const resp = await fetch('/api/notifications', { credentials: 'same-origin' });
+      const data = await resp.json();
+      const list = document.getElementById('notifList');
+      if (!data.notifications.length) {
+        list.innerHTML = '<div style="padding:2rem;text-align:center;opacity:0.5">No notifications yet.</div>';
+        return;
+      }
+      list.innerHTML = data.notifications.map(n => `
+        <div class="notif-item ${n.is_read ? 'notif-read' : 'notif-unread'}"
+             ${n.media_id ? `onclick="window.location='/watch/${n.media_id}'"` : n.kind === 'follow' ? `onclick="window.location='/profile/${n.actor}'"` : ''}>
+          <span class="notif-icon">${kindIcon(n.kind)}</span>
+          <div class="notif-body">
+            <p>${kindText(n)}</p>
+            <small>${n.created_at}</small>
+          </div>
+        </div>
+      `).join('');
+      // Update badge
+      if (notifBadge) {
+        notifBadge.textContent = data.unread;
+        notifBadge.style.display = data.unread > 0 ? 'flex' : 'none';
+      }
+    }
+
+    async function openNotifPanel() {
+      notifPanel.classList.add('open');
+      settingsOverlay.classList.add('open');
+      document.body.style.overflow = 'hidden';
+      await loadNotifications();
+      // Mark all as read
+      await fetch('/api/notifications/read', { method: 'POST', credentials: 'same-origin' });
+      if (notifBadge) notifBadge.style.display = 'none';
+    }
+
+    function closeNotifPanel() {
+      notifPanel.classList.remove('open');
+      settingsOverlay.classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    if (notifTrigger) {
+      notifTrigger.addEventListener('click', openNotifPanel);
+      notifClose.addEventListener('click', closeNotifPanel);
+    }
+  </script>
+</body>
+</html>

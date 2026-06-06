@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero container">
+  <div>
+    <h1>Share your paintings, sketches, and visual stories.</h1>
+    <p>Build a gallery for your creative work, publish new pieces instantly, and invite visitors to explore your artistic world.</p>
+    <div class="hero-buttons">
+      <a class="button" href="/explore"><i class="fas fa-magnifying-glass" style="margin-right:6px"></i>Explore Gallery</a>
+      <a class="button button-secondary" href="/upload">Upload Your Work</a>
+    </div>
+  </div>
+  <div class="hero-preview">
+    <div class="preview-card">
+      <span>Live uploads</span>
+      <strong>{{ count }} items available</strong>
+    </div>
+  </div>
+</section>
+
+{% if suggestions %}
+<section class="container section-grid">
+  <div class="section-intro">
+    <h2>Fan favorites</h2>
+    <p>Discover artists to follow and support their next uploads.</p>
+  </div>
+  <div class="user-grid">
+    {% for item in suggestions %}
+    <article class="user-card">
+      <div class="user-card-top">
+        <div class="user-avatar">{{ item.username[0].upper() }}</div>
+        <div>
+          <a href="/profile/{{ item.username }}"><h3>{{ item.username }}</h3></a>
+          <p>{{ item.bio or 'Creative portfolio and art fan favorite.' }}</p>
+        </div>
+      </div>
+      <div class="user-card-meta">
+        <span>{{ item.followers }} followers</span>
+        <a class="button button-secondary" href="/profile/{{ item.username }}">View profile</a>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% macro media_card(media) %}
+  <article class="media-card">
+    {% if media.media_type == 'video' %}
+      <div class="media-thumbnail video-thumb">
+        <i class="fas fa-play"></i>
+        <video muted>
+          <source src="/uploads/{{ media.filename }}" type="video/mp4" />
+        </video>
+      </div>
+    {% else %}
+      <img src="/uploads/{{ media.filename }}" alt="{{ media.title }}" />
+    {% endif %}
+    <div class="media-meta">
+      <a href="/watch/{{ media.id }}"><h3>{{ media.title }}</h3></a>
+      <p><a href="/profile/{{ media.uploader }}" class="uploader-link">{{ media.uploader }}</a> · {{ media.views }} views</p>
+      {% if current_user %}
+      <div class="card-actions">
+        <button class="card-like-btn{% if media.id in liked_ids %} liked{% endif %}" data-id="{{ media.id }}" title="Like">
+          <i class="fa{% if media.id in liked_ids %}s{% else %}r{% endif %} fa-heart"></i>
+        </button>
+        <button class="save-btn{% if media.id in saved_ids %} saved{% endif %}" data-id="{{ media.id }}" title="Save">
+          <i class="fa{% if media.id in saved_ids %}s{% else %}r{% endif %} fa-bookmark"></i>
+        </button>
+      </div>
+      {% endif %}
+    </div>
+  </article>
+{% endmacro %}
+
+<section class="container section-grid">
+  <div class="section-intro">
+    <h2>Trending now</h2>
+    <p>Popular photos and videos that are gaining attention.</p>
+  </div>
+  <div class="media-grid">
+    {% for media in trending_media %}{{ media_card(media) }}{% endfor %}
+  </div>
+</section>
+
+<section class="container section-grid">
+  <div class="section-intro">
+    <h2>Latest uploads</h2>
+    <p>View the newest photos and videos shared by your community.</p>
+  </div>
+  <div class="media-grid">
+    {% for media in latest_media %}{{ media_card(media) }}{% endfor %}
+  </div>
+</section>
+
+<script>
+document.querySelectorAll('.card-like-btn').forEach(btn => {
+  btn.addEventListener('click', async function() {
+    const id = this.dataset.id;
+    const resp = await fetch('/like/' + id, { method: 'POST', credentials: 'same-origin' });
+    if (!resp.ok) { alert('Sign in to like media.'); return; }
+    const data = await resp.json();
+    const icon = this.querySelector('i');
+    if (data.liked) { this.classList.add('liked'); icon.className = 'fas fa-heart'; }
+    else { this.classList.remove('liked'); icon.className = 'far fa-heart'; }
+  });
+});
+document.querySelectorAll('.save-btn').forEach(btn => {
+  btn.addEventListener('click', async function() {
+    const id = this.dataset.id;
+    const resp = await fetch('/save/' + id, { method: 'POST', credentials: 'same-origin' });
+    if (!resp.ok) { alert('Sign in to save media.'); return; }
+    const data = await resp.json();
+    const icon = this.querySelector('i');
+    if (data.saved) { this.classList.add('saved'); icon.className = 'fas fa-bookmark'; }
+    else { this.classList.remove('saved'); icon.className = 'far fa-bookmark'; }
+  });
+});
+</script>
+{% endblock %}

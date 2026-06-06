@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="container">
+  <div style="display:flex;gap:1.5rem;align-items:flex-start;flex-wrap:wrap">
+    <div style="width:96px;height:96px;border-radius:64px;overflow:hidden;background:var(--surface-2);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+      {% if user.avatar %}
+        <img src="/uploads/{{ user.avatar }}" style="width:100%;height:100%;object-fit:cover;" />
+      {% else %}
+        <span style="font-size:2rem;color:var(--muted)">{{ user.username[0].upper() }}</span>
+      {% endif %}
+    </div>
+    <div style="flex:1;min-width:180px">
+      <h2 style="margin-bottom:4px">{{ user.username }}</h2>
+      <p style="color:var(--muted);margin-bottom:10px">{{ user.bio or 'No bio yet.' }}</p>
+      <div style="margin-bottom:12px;font-size:0.95rem" id="follow-counts">
+        <span id="followers-count">{{ followers or 0 }}</span> followers ·
+        <span id="following-count">{{ following or 0 }}</span> following
+      </div>
+      {% if current_user and current_user.username != user.username %}
+        <button id="follow-btn" class="button">{% if is_following %}Unfollow{% else %}Follow{% endif %}</button>
+      {% endif %}
+      {% if current_user and current_user.username == user.username %}
+        <a href="/profile/{{ user.username }}/edit" class="button button-secondary">Edit Profile</a>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if suggestions %}
+  <section class="section-grid" style="margin-top:2rem">
+    <div class="section-intro">
+      <h2>More creators to follow</h2>
+      <p>Support other artists and grow your creative network.</p>
+    </div>
+    <div class="user-grid">
+      {% for item in suggestions %}
+      <article class="user-card">
+        <div class="user-card-top">
+          <div class="user-avatar">{{ item.username[0].upper() }}</div>
+          <div>
+            <a href="/profile/{{ item.username }}"><h3>{{ item.username }}</h3></a>
+            <p>{{ item.bio or 'Artist with a growing fanbase.' }}</p>
+          </div>
+        </div>
+        <div class="user-card-meta">
+          <span>{{ item.followers }} followers</span>
+          <a class="button button-secondary" href="/profile/{{ item.username }}">View profile</a>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <h3 style="margin-top:2rem;margin-bottom:1rem">Uploads</h3>
+  <div class="media-grid">
+    {% for m in media %}
+      <article class="media-card">
+        {% if m.media_type == 'video' %}
+          <div class="media-thumbnail video-thumb">
+            <video muted>
+              <source src="/uploads/{{ m.filename }}" type="video/mp4" />
+            </video>
+          </div>
+        {% else %}
+          <img src="/uploads/{{ m.filename }}" alt="{{ m.title }}" />
+        {% endif %}
+        <div class="media-meta">
+          <a href="/watch/{{ m.id }}"><h3>{{ m.title }}</h3></a>
+          <p style="font-size:0.8rem;opacity:0.6">{{ m.views }} views</p>
+        </div>
+      </article>
+    {% else %}
+      <p>No uploads yet.</p>
+    {% endfor %}
+  </div>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  const btn = document.getElementById('follow-btn');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    try {
+      const resp = await fetch(`/api/follow/{{ user.username }}/toggle`, { method: 'POST', credentials: 'same-origin' });
+      if (!resp.ok) throw new Error('Network response not ok');
+      const data = await resp.json();
+      btn.textContent = data.is_following ? 'Unfollow' : 'Follow';
+      document.getElementById('followers-count').textContent = data.followers;
+      document.getElementById('following-count').textContent = data.following;
+    } catch (err) {
+      alert('Unable to update follow state. Please try again.');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+});
+</script>
+{% endblock %}

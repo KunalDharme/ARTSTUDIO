@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="container form-section">
+  <div class="section-intro">
+    <h2>Sign in</h2>
+  </div>
+  {% if error %}
+    <div style="color:#ffb3b3">{{ error }}</div>
+  {% endif %}
+  <form action="/login" method="post" class="upload-form">
+    <label>Username<input type="text" name="username" required/></label>
+    <label>Password<input type="password" name="password" required/></label>
+    <button type="submit" class="button">Sign in</button>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="container form-section">
+  <div class="section-intro">
+    <h2>Edit Post</h2>
+  </div>
+  <form action="/posts/{{ post.id }}/edit" method="post" class="upload-form">
+    <label>Title<input type="text" name="title" value="{{ post.title }}" required/></label>
+    <label>Content<textarea name="content" id="content" rows="12">{{ post.content }}</textarea></label>
+    <label>Published
+      <select name="published">
+        <option value="1" {% if post.published %}selected{% endif %}>Yes</option>
+        <option value="0" {% if not post.published %}selected{% endif %}>No</option>
+      </select>
+    </label>
+    <div>
+      <label>Upload image: <input type="file" id="imageUpload" accept="image/*"/></label>
+      <button type="button" id="insertImage">Upload & Insert</button>
+    </div>
+    <button type="submit" class="button">Save</button>
+  </form>
+</section>
+<script>
+document.getElementById('insertImage').addEventListener('click', async () => {
+  const input = document.getElementById('imageUpload');
+  if (!input.files.length) return alert('Select a file first');
+  const file = input.files[0];
+  const form = new FormData();
+  form.append('file', file);
+  const resp = await fetch('/posts/upload_image', {method: 'POST', body: form});
+  if (!resp.ok) return alert('Upload failed');
+  const data = await resp.json();
+  const url = data.url;
+  const ta = document.getElementById('content');
+  ta.value += `\n![](${url})\n`;
+});
+</script>
+{% endblock %}
