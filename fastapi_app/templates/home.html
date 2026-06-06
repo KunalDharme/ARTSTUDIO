@@ -58,6 +58,11 @@
     <div class="media-meta">
       <a href="/watch/{{ media.id }}"><h3>{{ media.title }}</h3></a>
       <p><a href="/profile/{{ media.uploader }}" class="uploader-link">{{ media.uploader }}</a> · {{ media.views }} views</p>
+      {% if media.sale_status == 'fixed' and media.fixed_price %}
+        <div class="price-tag price-fixed"><i class="fas fa-tag"></i> ₹{{ "{:,}".format(media.fixed_price) }} Fixed</div>
+      {% elif media.sale_status == 'negotiable' and media.min_price and media.max_price %}
+        <div class="price-tag price-negotiable"><i class="fas fa-handshake"></i> ₹{{ "{:,}".format(media.min_price) }} – ₹{{ "{:,}".format(media.max_price) }}</div>
+      {% endif %}
       {% if current_user %}
       <div class="card-actions">
         <button class="card-like-btn{% if media.id in liked_ids %} liked{% endif %}" data-id="{{ media.id }}" title="Like">

@@ -268,18 +268,21 @@ async def upload_media(
     title: str = Form(...),
     description: str = Form(""),
     tags: str = Form(""),
+    sale_status: str = Form("showcase"),
+    fixed_price: str = Form(""),
+    min_price: str = Form(""),
+    max_price: str = Form(""),
     media_file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
     current_user = get_current_user(request, db)
     if not current_user:
-        return RedirectResponse(url="/login", status_code=HTTP_303_SEE_OTHER)
+        return redirect_with_flash("/login", "Please sign in to upload media.", "info")
 
     content_type = media_file.content_type
     if content_type not in ALLOWED_PHOTO_TYPES.union(ALLOWED_VIDEO_TYPES):
         raise HTTPException(status_code=400, detail="Upload must be an image or MP4/WebM video.")
 
-    # Read file into memory to check size (50MB images, 500MB videos)
     file_bytes = await media_file.read()
     max_bytes = 500 * 1024 * 1024 if content_type.startswith("video/") else 50 * 1024 * 1024
     if len(file_bytes) > max_bytes:
@@ -299,6 +302,14 @@ async def upload_media(
     with open(save_path, "wb") as buffer:
         buffer.write(file_bytes)
 
+    # Parse prices — store as integer rupees
+    def _parse_price(val: str) -> int | None:
+        try:
+            return max(0, int(val.strip())) if val.strip() else None
+        except ValueError:
+            return None
+
+    sale_status = sale_status if sale_status in ("showcase", "fixed", "negotiable") else "showcase"
     media_type = "video" if content_type.startswith("video/") else "image"
     media = schemas.MediaCreate(
         title=title.strip() or "Untitled Upload",
@@ -306,6 +317,10 @@ async def upload_media(
         tags=tags.strip(),
         uploader=current_user.username,
         media_type=media_type,
+        sale_status=sale_status,
+        fixed_price=_parse_price(fixed_price) if sale_status == "fixed" else None,
+        min_price=_parse_price(min_price) if sale_status == "negotiable" else None,
+        max_price=_parse_price(max_price) if sale_status == "negotiable" else None,
     )
     crud.create_media_item(db, media, filename, uploader_id=current_user.id)
     return redirect_with_flash("/browse", "Your media was uploaded successfully!", "success")
@@ -899,6 +914,146 @@ def toggle_save(media_id: int, request: Request, db: Session = Depends(get_db)):
         return JSONResponse({"error": "Login required"}, status_code=401)
     saved = crud.toggle_saved(db, media_id, current_user.id)
     return JSONResponse({"saved": saved})
+
+
+@app.get("/buy-request/{media_id}")
+def buy_request_form(media_id: int, request: Request, db: Session = Depends(get_db)):
+    current_user = get_current_user(request, db)
+    if not current_user:
+        return redirect_with_flash("/login", "Please sign in to raise a buy request.", "info")
+    media_item = crud.get_media_item(db, media_id)
+    if not media_item:
+        raise HTTPException(status_code=404, detail="Artwork not found")
+    if media_item.sale_status == "showcase":
+        return redirect_with_flash(f"/watch/{media_id}", "This artwork is not available for purchase.", "info")
+    if media_item.uploader_id == current_user.id:
+        return redirect_with_flash(f"/watch/{media_id}", "You cannot buy your own artwork.", "info")
+    if media_item.artwork_status != "available":
+        return redirect_with_flash(f"/watch/{media_id}", f"This artwork is {media_item.artwork_status}.", "info")
+    if crud.has_pending_request(db, media_id, current_user.id):
+        return redirect_with_flash(f"/watch/{media_id}", "You already have an active request for this artwork.", "info")
+    return render_template(request, "buy_request.html", db, media=media_item)
+
+
+@app.post("/buy-request/{media_id}")
+def submit_buy_request(
+    media_id: int,
+    request: Request,
+    offer_price: str = Form(""),
+    message: str = Form(""),
+    purchase_type: str = Form("original"),
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    if not current_user:
+        return redirect_with_flash("/login", "Please sign in.", "info")
+    media_item = crud.get_media_item(db, media_id)
+    if not media_item or media_item.sale_status == "showcase":
+        raise HTTPException(status_code=400, detail="Not available for purchase")
+    if media_item.uploader_id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot buy your own artwork")
+    if crud.has_pending_request(db, media_id, current_user.id):
+        return redirect_with_flash(f"/watch/{media_id}", "You already have an active request.", "info")
+
+    # Parse and validate price
+    try:
+        price = int(offer_price.strip()) if offer_price.strip() else None
+    except ValueError:
+        price = None
+
+    if media_item.sale_status == "fixed" and media_item.fixed_price:
+        price = price or media_item.fixed_price
+    elif media_item.sale_status == "negotiable":
+        if price is None:
+            return redirect_with_flash(f"/buy-request/{media_id}", "Please enter an offer price.", "error")
+        if media_item.min_price and price < media_item.min_price:
+            return redirect_with_flash(f"/buy-request/{media_id}", f"Offer must be at least ₹{media_item.min_price:,}.", "error")
+        if media_item.max_price and price > media_item.max_price:
+            return redirect_with_flash(f"/buy-request/{media_id}", f"Offer cannot exceed ₹{media_item.max_price:,}.", "error")
+
+    req = crud.create_buy_request(
+        db,
+        media_id=media_id,
+        buyer_id=current_user.id,
+        offer_price=price,
+        message=message.strip()[:300] if message.strip() else None,
+        purchase_type=purchase_type,
+    )
+    # Notify the artist
+    if media_item.uploader_id:
+        crud.create_notification(
+            db,
+            user_id=media_item.uploader_id,
+            actor_id=current_user.id,
+            kind="buy_request",
+            media_id=media_id,
+        )
+    return redirect_with_flash(f"/watch/{media_id}", "Your buy request has been sent! The artist will respond soon.", "success")
+
+
+@app.get("/requests")
+def my_requests(request: Request, db: Session = Depends(get_db)):
+    current_user = get_current_user(request, db)
+    if not current_user:
+        return redirect_with_flash("/login", "Please sign in.", "info")
+    # Requests buyer sent
+    sent = crud.get_requests_by_buyer(db, current_user.id)
+    # Requests artist received
+    received = crud.get_requests_for_artist(db, current_user.id)
+    # Enrich with media and user info
+    def enrich(reqs):
+        result = []
+        for r in reqs:
+            media = crud.get_media_item(db, r.media_id)
+            buyer = db.query(models.User).filter(models.User.id == r.buyer_id).first()
+            result.append({"req": r, "media": media, "buyer": buyer})
+        return result
+    return render_template(request, "requests.html", db,
+                           sent=enrich(sent), received=enrich(received))
+
+
+@app.post("/requests/{request_id}/accept")
+def accept_buy_request(request_id: int, request: Request, db: Session = Depends(get_db)):
+    current_user = get_current_user(request, db)
+    if not current_user:
+        return redirect_with_flash("/login", "Please sign in.", "info")
+    req = crud.get_buy_request(db, request_id)
+    if not req:
+        raise HTTPException(status_code=404)
+    media = crud.get_media_item(db, req.media_id)
+    if not media or media.uploader_id != current_user.id:
+        raise HTTPException(status_code=403)
+    crud.update_request_status(db, request_id, "accepted")
+    crud.create_notification(db, user_id=req.buyer_id, actor_id=current_user.id, kind="request_accepted", media_id=req.media_id)
+    return redirect_with_flash("/requests", "Request accepted! The deal room will open in Stage 3.", "success")
+
+
+@app.post("/requests/{request_id}/reject")
+def reject_buy_request(request_id: int, request: Request, db: Session = Depends(get_db)):
+    current_user = get_current_user(request, db)
+    if not current_user:
+        return redirect_with_flash("/login", "Please sign in.", "info")
+    req = crud.get_buy_request(db, request_id)
+    if not req:
+        raise HTTPException(status_code=404)
+    media = crud.get_media_item(db, req.media_id)
+    if not media or media.uploader_id != current_user.id:
+        raise HTTPException(status_code=403)
+    crud.update_request_status(db, request_id, "rejected")
+    crud.create_notification(db, user_id=req.buyer_id, actor_id=current_user.id, kind="request_rejected", media_id=req.media_id)
+    return redirect_with_flash("/requests", "Request rejected.", "success")
+
+
+@app.post("/requests/{request_id}/cancel")
+def cancel_buy_request(request_id: int, request: Request, db: Session = Depends(get_db)):
+    current_user = get_current_user(request, db)
+    if not current_user:
+        return redirect_with_flash("/login", "Please sign in.", "info")
+    req = crud.get_buy_request(db, request_id)
+    if not req or req.buyer_id != current_user.id:
+        raise HTTPException(status_code=403)
+    crud.update_request_status(db, request_id, "cancelled")
+    return redirect_with_flash("/requests", "Request cancelled.", "success")
 
 
 @app.get("/api/media", response_model=list[schemas.MediaRead])

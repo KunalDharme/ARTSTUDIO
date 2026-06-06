@@ -7,6 +7,10 @@ class MediaBase(BaseModel):
     description: str | None = None
     tags: str | None = None
     uploader: str | None = "Guest"
+    sale_status: str = "showcase"
+    fixed_price: int | None = None
+    min_price: int | None = None
+    max_price: int | None = None
 
 
 class MediaCreate(MediaBase):
@@ -19,6 +23,7 @@ class MediaRead(MediaBase):
     media_type: str
     views: int
     created_at: datetime
+    artwork_status: str = "available"
 
     model_config = ConfigDict(from_attributes=True)
 

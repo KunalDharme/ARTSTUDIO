@@ -1,3 +1,4 @@
+
 {% extends "base.html" %}
 {% block content %}
 <section class="container form-section">
@@ -5,7 +6,8 @@
     <h2>Upload a photo or video</h2>
     <p>Share professional media with your audience in seconds.</p>
   </div>
-  <form action="/upload" method="post" enctype="multipart/form-data" class="upload-form">
+  <form action="/upload" method="post" enctype="multipart/form-data" class="upload-form" id="uploadForm">
+
     <label>
       Title
       <input type="text" name="title" placeholder="Media title" required />
@@ -19,58 +21,157 @@
       <input type="text" name="tags" placeholder="Comma-separated tags (e.g. travel, portrait)" />
     </label>
 
-    <div class="file-drop-zone" id="dropZone">
+    <!-- Hidden radio inputs for form submission -->
+    <input type="radio" name="sale_status" id="radio-showcase" value="showcase" checked style="display:none" />
+    <input type="radio" name="sale_status" id="radio-fixed" value="fixed" style="display:none" />
+    <input type="radio" name="sale_status" id="radio-negotiable" value="negotiable" style="display:none" />
+
+    <!-- Sale Status Visual Selector -->
+    <div style="margin-top:1rem">
+      <p style="font-weight:700;margin-bottom:10px">Sale Status</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div class="sale-option-card active" id="card-showcase" onclick="selectSale('showcase')">
+          <i class="fas fa-eye"></i>
+          <span>Showcase Only</span>
+          <small>Not for sale</small>
+        </div>
+        <div class="sale-option-card" id="card-fixed" onclick="selectSale('fixed')">
+          <i class="fas fa-tag"></i>
+          <span>Fixed Price</span>
+          <small>Set a selling price</small>
+        </div>
+        <div class="sale-option-card" id="card-negotiable" onclick="selectSale('negotiable')">
+          <i class="fas fa-handshake"></i>
+          <span>Negotiable</span>
+          <small>Set a price range</small>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fixed Price Fields -->
+    <div id="fixed-fields" style="display:none;margin-top:1rem">
+      <label>
+        Fixed Price (₹)
+        <input type="number" name="fixed_price" min="1" placeholder="e.g. 5000" id="fixedPriceInput" />
+      </label>
+    </div>
+
+    <!-- Negotiable Price Fields -->
+    <div id="negotiable-fields" style="display:none;margin-top:1rem">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <label>
+          Minimum Price (₹)
+          <input type="number" name="min_price" min="1" placeholder="e.g. 4000" id="minPriceInput" />
+        </label>
+        <label>
+          Maximum Price (₹)
+          <input type="number" name="max_price" min="1" placeholder="e.g. 6000" id="maxPriceInput" />
+        </label>
+      </div>
+    </div>
+
+    <!-- File Drop Zone -->
+    <div class="file-drop-zone" id="dropZone" style="margin-top:1.5rem">
       <i class="fas fa-cloud-arrow-up" style="font-size:2rem;margin-bottom:8px;opacity:0.5"></i>
       <p style="margin:0;font-weight:600">Drag & drop or click to choose file</p>
       <p style="margin:4px 0 0;font-size:0.85rem;opacity:0.6">Images up to 50 MB · Videos up to 500 MB</p>
-      <input type="file" name="media_file" id="mediaFileInput" accept="image/*,video/mp4,video/webm" required style="position:absolute;inset:0;opacity:0;cursor:pointer" />
+      <input type="file" name="media_file" id="mediaFileInput"
+             accept="image/*,video/mp4,video/webm" required
+             style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%" />
     </div>
 
-    <!-- Preview area -->
+    <!-- Preview -->
     <div id="filePreview" style="display:none;margin-top:12px;text-align:center">
       <img id="previewImg" style="max-width:100%;max-height:300px;border-radius:12px;display:none" />
       <video id="previewVideo" controls style="max-width:100%;max-height:300px;border-radius:12px;display:none"></video>
       <p id="previewName" style="font-size:0.85rem;opacity:0.7;margin-top:6px"></p>
     </div>
 
-    <button type="submit" class="button" style="margin-top:8px">Upload</button>
+    <button type="submit" class="button" id="uploadSubmitBtn" style="margin-top:1.5rem">
+      <i class="fas fa-upload"></i> Upload
+    </button>
   </form>
 </section>
 
 <script>
-const input = document.getElementById('mediaFileInput');
-const dropZone = document.getElementById('dropZone');
-const preview = document.getElementById('filePreview');
-const previewImg = document.getElementById('previewImg');
-const previewVideo = document.getElementById('previewVideo');
-const previewName = document.getElementById('previewName');
+// ── Sale status selector ──
+function selectSale(val) {
+  // Update hidden radios
+  document.getElementById('radio-showcase').checked = val === 'showcase';
+  document.getElementById('radio-fixed').checked    = val === 'fixed';
+  document.getElementById('radio-negotiable').checked = val === 'negotiable';
+
+  // Update card styles
+  ['showcase', 'fixed', 'negotiable'].forEach(function(v) {
+    var card = document.getElementById('card-' + v);
+    card.classList.toggle('active', v === val);
+  });
+
+  // Show/hide price fields
+  document.getElementById('fixed-fields').style.display      = val === 'fixed' ? 'block' : 'none';
+  document.getElementById('negotiable-fields').style.display = val === 'negotiable' ? 'block' : 'none';
+
+  // Toggle required attributes
+  document.getElementById('fixedPriceInput').required = val === 'fixed';
+  document.getElementById('minPriceInput').required   = val === 'negotiable';
+  document.getElementById('maxPriceInput').required   = val === 'negotiable';
+}
+
+// ── File preview ──
+var mediaInput = document.getElementById('mediaFileInput');
+var dropZone   = document.getElementById('dropZone');
 
 function showPreview(file) {
+  var preview = document.getElementById('filePreview');
+  var img     = document.getElementById('previewImg');
+  var video   = document.getElementById('previewVideo');
+  var name    = document.getElementById('previewName');
   preview.style.display = 'block';
-  previewName.textContent = file.name + ' (' + (file.size / 1024 / 1024).toFixed(1) + ' MB)';
-  const url = URL.createObjectURL(file);
+  name.textContent = file.name + ' (' + (file.size / 1024 / 1024).toFixed(1) + ' MB)';
+  var url = URL.createObjectURL(file);
   if (file.type.startsWith('video/')) {
-    previewImg.style.display = 'none';
-    previewVideo.style.display = 'block';
-    previewVideo.src = url;
+    img.style.display   = 'none';
+    video.style.display = 'block';
+    video.src = url;
   } else {
-    previewVideo.style.display = 'none';
-    previewImg.style.display = 'block';
-    previewImg.src = url;
+    video.style.display = 'none';
+    img.style.display   = 'block';
+    img.src = url;
   }
 }
 
-input.addEventListener('change', function() {
+mediaInput.addEventListener('change', function() {
   if (this.files[0]) showPreview(this.files[0]);
 });
 
-dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-dropZone.addEventListener('drop', e => {
-  e.preventDefault();
+dropZone.addEventListener('dragover', function(e) {
+  e.preventDefault(); dropZone.classList.add('drag-over');
+});
+dropZone.addEventListener('dragleave', function() {
   dropZone.classList.remove('drag-over');
-  const file = e.dataTransfer.files[0];
-  if (file) { input.files = e.dataTransfer.files; showPreview(file); }
+});
+dropZone.addEventListener('drop', function(e) {
+  e.preventDefault(); dropZone.classList.remove('drag-over');
+  var file = e.dataTransfer.files[0];
+  if (file) { mediaInput.files = e.dataTransfer.files; showPreview(file); }
+});
+
+// ── Double-submit guard + file selected check ──
+var isSubmitting = false;
+document.getElementById('uploadForm').addEventListener('submit', function(e) {
+  if (!mediaInput.files || mediaInput.files.length === 0) {
+    e.preventDefault();
+    alert('Please choose a file to upload.');
+    return;
+  }
+  if (isSubmitting) {
+    e.preventDefault();
+    return;
+  }
+  isSubmitting = true;
+  var btn = document.getElementById('uploadSubmitBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading… please wait';
 });
 </script>
 {% endblock %}

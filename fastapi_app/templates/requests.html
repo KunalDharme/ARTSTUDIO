@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="container">
+  <div class="section-intro">
+    <h2>Buy Requests</h2>
+    <p>Manage your sent and received artwork purchase requests.</p>
+  </div>
+
+  <!-- Tabs -->
+  <div class="requests-tabs">
+    <button class="req-tab active" data-tab="received">
+      Received <span class="req-count">{{ received|length }}</span>
+    </button>
+    <button class="req-tab" data-tab="sent">
+      Sent <span class="req-count">{{ sent|length }}</span>
+    </button>
+  </div>
+
+  <!-- Received requests (artist view) -->
+  <div id="tab-received" class="req-tab-body">
+    {% if received %}
+      {% for item in received %}
+        <div class="request-card status-{{ item.req.status }}">
+          <div class="request-card-media">
+            {% if item.media %}
+              {% if item.media.media_type == 'video' %}
+                <div style="width:64px;height:64px;border-radius:8px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                  <i class="fas fa-play" style="opacity:0.5"></i>
+                </div>
+              {% else %}
+                <img src="/uploads/{{ item.media.filename }}" alt="{{ item.media.title }}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0" />
+              {% endif %}
+            {% endif %}
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+                <div>
+                  <a href="/watch/{{ item.req.media_id }}"><strong>{{ item.media.title if item.media else 'Unknown' }}</strong></a>
+                  <p style="margin:2px 0;font-size:0.85rem;opacity:0.7">
+                    From <a href="/profile/{{ item.buyer.username if item.buyer else '#' }}" class="uploader-link">{{ item.buyer.username if item.buyer else 'Unknown' }}</a>
+                    · {{ item.req.purchase_type.capitalize() }}
+                    · {{ item.req.created_at.strftime('%b %d, %Y') }}
+                  </p>
+                  {% if item.req.offer_price %}
+                    <p style="margin:4px 0;font-weight:700;font-size:1rem">₹{{ "{:,}".format(item.req.offer_price) }}</p>
+                  {% endif %}
+                  {% if item.req.message %}
+                    <p style="margin:4px 0;font-size:0.85rem;opacity:0.75;font-style:italic">"{{ item.req.message }}"</p>
+                  {% endif %}
+                </div>
+                <span class="request-status-badge badge-{{ item.req.status }}">{{ item.req.status.capitalize() }}</span>
+              </div>
+              {% if item.req.status == 'pending' %}
+                <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+                  <form action="/requests/{{ item.req.id }}/accept" method="post" style="display:inline">
+                    <button type="submit" class="button" style="background:#38a169;color:#fff;padding:6px 16px;font-size:0.85rem">
+                      <i class="fas fa-check"></i> Accept
+                    </button>
+                  </form>
+                  <form action="/requests/{{ item.req.id }}/reject" method="post" style="display:inline"
+                        onsubmit="return confirm('Reject this request?')">
+                    <button type="submit" class="button button-danger" style="padding:6px 16px;font-size:0.85rem">
+                      <i class="fas fa-xmark"></i> Reject
+                    </button>
+                  </form>
+                </div>
+              {% elif item.req.status == 'accepted' %}
+                <div style="margin-top:10px">
+                  <span style="color:#38a169;font-size:0.85rem;font-weight:600">
+                    <i class="fas fa-circle-check"></i> Accepted — Deal Room coming in next update
+                  </span>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state" style="padding:3rem;text-align:center">
+        <i class="fas fa-inbox" style="font-size:2.5rem;opacity:0.3;display:block;margin-bottom:12px"></i>
+        <p>No buy requests received yet.</p>
+        <p style="font-size:0.85rem;opacity:0.6">When buyers request to purchase your artwork, they'll appear here.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Sent requests (buyer view) -->
+  <div id="tab-sent" class="req-tab-body" style="display:none">
+    {% if sent %}
+      {% for item in sent %}
+        <div class="request-card status-{{ item.req.status }}">
+          <div class="request-card-media">
+            {% if item.media %}
+              {% if item.media.media_type == 'video' %}
+                <div style="width:64px;height:64px;border-radius:8px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                  <i class="fas fa-play" style="opacity:0.5"></i>
+                </div>
+              {% else %}
+                <img src="/uploads/{{ item.media.filename }}" alt="{{ item.media.title }}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0" />
+              {% endif %}
+            {% endif %}
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+                <div>
+                  <a href="/watch/{{ item.req.media_id }}"><strong>{{ item.media.title if item.media else 'Unknown' }}</strong></a>
+                  <p style="margin:2px 0;font-size:0.85rem;opacity:0.7">
+                    To <a href="/profile/{{ item.media.uploader if item.media else '#' }}" class="uploader-link">{{ item.media.uploader if item.media else 'Unknown' }}</a>
+                    · {{ item.req.purchase_type.capitalize() }}
+                    · {{ item.req.created_at.strftime('%b %d, %Y') }}
+                  </p>
+                  {% if item.req.offer_price %}
+                    <p style="margin:4px 0;font-weight:700;font-size:1rem">₹{{ "{:,}".format(item.req.offer_price) }}</p>
+                  {% endif %}
+                  {% if item.req.message %}
+                    <p style="margin:4px 0;font-size:0.85rem;opacity:0.75;font-style:italic">"{{ item.req.message }}"</p>
+                  {% endif %}
+                </div>
+                <span class="request-status-badge badge-{{ item.req.status }}">{{ item.req.status.capitalize() }}</span>
+              </div>
+              {% if item.req.status == 'pending' %}
+                <form action="/requests/{{ item.req.id }}/cancel" method="post" style="margin-top:10px;display:inline"
+                      onsubmit="return confirm('Cancel this request?')">
+                  <button type="submit" class="button" style="padding:6px 14px;font-size:0.85rem;opacity:0.7">
+                    <i class="fas fa-xmark"></i> Cancel Request
+                  </button>
+                </form>
+              {% elif item.req.status == 'accepted' %}
+                <div style="margin-top:10px">
+                  <span style="color:#38a169;font-size:0.85rem;font-weight:600">
+                    <i class="fas fa-circle-check"></i> Accepted — Deal Room opening soon
+                  </span>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state" style="padding:3rem;text-align:center">
+        <i class="fas fa-hand-holding-heart" style="font-size:2.5rem;opacity:0.3;display:block;margin-bottom:12px"></i>
+        <p>No buy requests sent yet.</p>
+        <a class="button" href="/explore" style="margin-top:8px">Explore Artwork</a>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+<script>
+document.querySelectorAll('.req-tab').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.req-tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.req-tab-body').forEach(b => b.style.display = 'none');
+    this.classList.add('active');
+    document.getElementById('tab-' + this.dataset.tab).style.display = 'block';
+  });
+});
+</script>
+{% endblock %}

@@ -53,6 +53,15 @@
           {% endif %}
           <p>{{ media.description or 'No description provided.' }}</p>
           <span><a href="/profile/{{ media.uploader }}" class="uploader-link">{{ media.uploader }}</a> · {{ media.views }} views</span>
+          {% if media.sale_status == 'fixed' and media.fixed_price %}
+            <div class="price-tag price-fixed">
+              <i class="fas fa-tag"></i> ₹{{ "{:,}".format(media.fixed_price) }} Fixed
+            </div>
+          {% elif media.sale_status == 'negotiable' and media.min_price and media.max_price %}
+            <div class="price-tag price-negotiable">
+              <i class="fas fa-handshake"></i> ₹{{ "{:,}".format(media.min_price) }} – ₹{{ "{:,}".format(media.max_price) }}
+            </div>
+          {% endif %}
         </div>
       </article>
     {% endfor %}

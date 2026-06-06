@@ -16,6 +16,11 @@ class MediaItem(Base):
     uploader_id = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     views = Column(Integer, default=0)
+    sale_status = Column(String(20), nullable=False, default="showcase")  # showcase | fixed | negotiable
+    fixed_price = Column(Integer, nullable=True)       # in smallest currency unit (paise / cents)
+    min_price = Column(Integer, nullable=True)
+    max_price = Column(Integer, nullable=True)
+    artwork_status = Column(String(20), nullable=False, default="available")  # available | reserved | sold
 
 
 class User(Base):
@@ -92,3 +97,17 @@ class Notification(Base):
     media_id = Column(Integer, nullable=True)                # for like/comment
     is_read = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class BuyRequest(Base):
+    __tablename__ = "buy_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    media_id = Column(Integer, nullable=False, index=True)
+    buyer_id = Column(Integer, nullable=False, index=True)
+    offer_price = Column(Integer, nullable=True)
+    message = Column(String(300), nullable=True)
+    purchase_type = Column(String(30), default="original")  # original | print | commission
+    status = Column(String(20), default="pending")          # pending | accepted | rejected | cancelled
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

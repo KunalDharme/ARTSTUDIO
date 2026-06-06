@@ -16,6 +16,47 @@
         <p class="tag-list">#{{ media.tags.replace(', ', ' #')|replace(',', ' #') }}</p>
       {% endif %}
       <p>{{ media.description or 'No description available for this item.' }}</p>
+
+      <!-- Sale status -->
+      {% if media.sale_status == 'fixed' and media.fixed_price %}
+        <div class="watch-price-block">
+          <div class="price-tag price-fixed" style="font-size:1rem;padding:8px 16px">
+            <i class="fas fa-tag"></i> ₹{{ "{:,}".format(media.fixed_price) }} — Fixed Price
+          </div>
+          {% if media.artwork_status == 'available' %}
+            {% if current_user and current_user.id != media.uploader_id %}
+              <a href="/buy-request/{{ media.id }}" class="button buy-request-btn">
+                <i class="fas fa-hand-holding-heart"></i> Raise Buy Request
+              </a>
+            {% elif not current_user %}
+              <a href="/login" class="button buy-request-btn">Sign in to Buy</a>
+            {% endif %}
+          {% else %}
+            <span class="artwork-status-badge status-{{ media.artwork_status }}">
+              {{ media.artwork_status.capitalize() }}
+            </span>
+          {% endif %}
+        </div>
+      {% elif media.sale_status == 'negotiable' and media.min_price and media.max_price %}
+        <div class="watch-price-block">
+          <div class="price-tag price-negotiable" style="font-size:1rem;padding:8px 16px">
+            <i class="fas fa-handshake"></i> ₹{{ "{:,}".format(media.min_price) }} – ₹{{ "{:,}".format(media.max_price) }} — Negotiable
+          </div>
+          {% if media.artwork_status == 'available' %}
+            {% if current_user and current_user.id != media.uploader_id %}
+              <a href="/buy-request/{{ media.id }}" class="button buy-request-btn">
+                <i class="fas fa-hand-holding-heart"></i> Raise Buy Request
+              </a>
+            {% elif not current_user %}
+              <a href="/login" class="button buy-request-btn">Sign in to Buy</a>
+            {% endif %}
+          {% else %}
+            <span class="artwork-status-badge status-{{ media.artwork_status }}">
+              {{ media.artwork_status.capitalize() }}
+            </span>
+          {% endif %}
+        </div>
+      {% endif %}
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
         <button id="likeBtn" class="button">{% if user_liked %}Unlike{% else %}Like{% endif %}</button>
         <span id="likesCount">{{ likes }} likes</span>

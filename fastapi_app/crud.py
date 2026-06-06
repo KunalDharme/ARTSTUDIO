@@ -133,6 +133,10 @@ def create_media_item(db: Session, media: schemas.MediaCreate, filename: str, up
         media_type=media.media_type,
         uploader=media.uploader or "Guest",
         uploader_id=uploader_id,
+        sale_status=media.sale_status or "showcase",
+        fixed_price=media.fixed_price,
+        min_price=media.min_price,
+        max_price=media.max_price,
         created_at=datetime.utcnow(),
     )
     db.add(db_item)
@@ -534,3 +538,68 @@ def delete_read_notifications(db: Session, user_id: int) -> None:
         models.Notification.is_read == True,
     ).delete()
     db.commit()
+
+
+# ----------------- Buy Requests -----------------
+def create_buy_request(
+    db: Session,
+    media_id: int,
+    buyer_id: int,
+    offer_price: int | None,
+    message: str | None,
+    purchase_type: str = "original",
+) -> models.BuyRequest:
+    req = models.BuyRequest(
+        media_id=media_id,
+        buyer_id=buyer_id,
+        offer_price=offer_price,
+        message=message,
+        purchase_type=purchase_type,
+    )
+    db.add(req)
+    db.commit()
+    db.refresh(req)
+    return req
+
+
+def get_buy_request(db: Session, request_id: int) -> models.BuyRequest | None:
+    return db.query(models.BuyRequest).filter(models.BuyRequest.id == request_id).first()
+
+
+def get_requests_for_artist(db: Session, user_id: int) -> list[models.BuyRequest]:
+    """All buy requests for media owned by this user."""
+    media_ids = db.query(models.MediaItem.id).filter(models.MediaItem.uploader_id == user_id).subquery()
+    return (
+        db.query(models.BuyRequest)
+        .filter(models.BuyRequest.media_id.in_(media_ids))
+        .order_by(models.BuyRequest.created_at.desc())
+        .all()
+    )
+
+
+def get_requests_by_buyer(db: Session, buyer_id: int) -> list[models.BuyRequest]:
+    return (
+        db.query(models.BuyRequest)
+        .filter(models.BuyRequest.buyer_id == buyer_id)
+        .order_by(models.BuyRequest.created_at.desc())
+        .all()
+    )
+
+
+def has_pending_request(db: Session, media_id: int, buyer_id: int) -> bool:
+    return db.query(models.BuyRequest).filter(
+        models.BuyRequest.media_id == media_id,
+        models.BuyRequest.buyer_id == buyer_id,
+        models.BuyRequest.status.in_(["pending", "accepted"]),
+    ).count() > 0
+
+
+def update_request_status(db: Session, request_id: int, status: str) -> models.BuyRequest | None:
+    req = get_buy_request(db, request_id)
+    if not req:
+        return None
+    req.status = status
+    db.add(req)
+    db.commit()
+    db.refresh(req)
+    return req

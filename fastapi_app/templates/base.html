@@ -39,6 +39,7 @@
         <a href="/upload">Upload</a>
         {% if current_user %}
           <a href="/dashboard">Dashboard</a>
+          <a href="/requests">Requests</a>
           <a href="/profile/{{ current_user.username }}">Hi, {{ current_user.username }}</a>
           <button class="settings-trigger" id="settingsTrigger" aria-label="Settings" title="Settings">
             <i class="fas fa-gear"></i>
@@ -361,16 +362,22 @@
     const settingsOverlay = document.getElementById('settingsOverlay');
 
     function kindIcon(kind) {
-      if (kind === 'follow')  return '<i class="fas fa-user-plus" style="color:#4299e1"></i>';
-      if (kind === 'like')    return '<i class="fas fa-heart" style="color:#e53e3e"></i>';
-      if (kind === 'comment') return '<i class="fas fa-comment" style="color:#38a169"></i>';
+      if (kind === 'follow')           return '<i class="fas fa-user-plus" style="color:#4299e1"></i>';
+      if (kind === 'like')             return '<i class="fas fa-heart" style="color:#e53e3e"></i>';
+      if (kind === 'comment')          return '<i class="fas fa-comment" style="color:#38a169"></i>';
+      if (kind === 'buy_request')      return '<i class="fas fa-hand-holding-heart" style="color:#d69e2e"></i>';
+      if (kind === 'request_accepted') return '<i class="fas fa-circle-check" style="color:#38a169"></i>';
+      if (kind === 'request_rejected') return '<i class="fas fa-circle-xmark" style="color:#e53e3e"></i>';
       return '<i class="fas fa-bell"></i>';
     }
 
     function kindText(n) {
-      if (n.kind === 'follow')  return `<strong>${n.actor}</strong> started following you`;
-      if (n.kind === 'like')    return `<strong>${n.actor}</strong> liked <em>${n.media_title || 'your media'}</em>`;
-      if (n.kind === 'comment') return `<strong>${n.actor}</strong> commented on <em>${n.media_title || 'your media'}</em>`;
+      if (n.kind === 'follow')           return `<strong>${n.actor}</strong> started following you`;
+      if (n.kind === 'like')             return `<strong>${n.actor}</strong> liked <em>${n.media_title || 'your media'}</em>`;
+      if (n.kind === 'comment')          return `<strong>${n.actor}</strong> commented on <em>${n.media_title || 'your media'}</em>`;
+      if (n.kind === 'buy_request')      return `<strong>${n.actor}</strong> sent a buy request for <em>${n.media_title || 'your artwork'}</em>`;
+      if (n.kind === 'request_accepted') return `Your buy request for <em>${n.media_title || 'an artwork'}</em> was <strong>accepted</strong>`;
+      if (n.kind === 'request_rejected') return `Your buy request for <em>${n.media_title || 'an artwork'}</em> was <strong>declined</strong>`;
       return `<strong>${n.actor}</strong> did something`;
     }
 

@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="container form-section" style="max-width:560px">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:1.5rem">
+    <a href="/watch/{{ media.id }}" style="opacity:0.6;font-size:0.9rem">← Back</a>
+  </div>
+
+  <!-- Artwork summary -->
+  <div class="deal-artwork-card">
+    {% if media.media_type == 'video' %}
+      <div style="width:80px;height:80px;border-radius:10px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <i class="fas fa-play" style="font-size:1.5rem;opacity:0.5"></i>
+      </div>
+    {% else %}
+      <img src="/uploads/{{ media.filename }}" alt="{{ media.title }}" style="width:80px;height:80px;object-fit:cover;border-radius:10px;flex-shrink:0" />
+    {% endif %}
+    <div>
+      <h3 style="margin:0 0 4px">{{ media.title }}</h3>
+      <p style="margin:0;opacity:0.6;font-size:0.9rem">by <a href="/profile/{{ media.uploader }}" class="uploader-link">{{ media.uploader }}</a></p>
+      {% if media.sale_status == 'fixed' %}
+        <div class="price-tag price-fixed" style="margin-top:6px"><i class="fas fa-tag"></i> ₹{{ "{:,}".format(media.fixed_price) }} Fixed Price</div>
+      {% elif media.sale_status == 'negotiable' %}
+        <div class="price-tag price-negotiable" style="margin-top:6px"><i class="fas fa-handshake"></i> ₹{{ "{:,}".format(media.min_price) }} – ₹{{ "{:,}".format(media.max_price) }} Negotiable</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="section-intro" style="margin-top:1.5rem">
+    <h2>Raise a Buy Request</h2>
+    <p>Express your interest in purchasing this artwork. The artist will review your request.</p>
+  </div>
+
+  <form action="/buy-request/{{ media.id }}" method="post" class="upload-form" id="buyRequestForm">
+
+    <label>
+      Purchase Type
+      <select name="purchase_type" style="padding:8px 12px;border-radius:8px;border:1px solid var(--surface-2);background:var(--surface-1);color:inherit;font-size:0.95rem">
+        <option value="original">Original Artwork</option>
+        <option value="print">Print</option>
+        <option value="commission">Commission</option>
+      </select>
+    </label>
+
+    {% if media.sale_status == 'fixed' %}
+      <div style="background:var(--surface-2);border-radius:10px;padding:12px;font-size:0.9rem">
+        <strong>Listed Price: ₹{{ "{:,}".format(media.fixed_price) }}</strong><br>
+        <span style="opacity:0.7">You can offer the listed price or request a discount.</span>
+      </div>
+      <label>
+        Your Offer Price (₹)
+        <input type="number" name="offer_price" min="1" placeholder="Leave blank to accept listed price ₹{{ media.fixed_price }}" value="{{ media.fixed_price }}" />
+      </label>
+    {% elif media.sale_status == 'negotiable' %}
+      <div style="background:var(--surface-2);border-radius:10px;padding:12px;font-size:0.9rem">
+        <strong>Accepted Range: ₹{{ "{:,}".format(media.min_price) }} – ₹{{ "{:,}".format(media.max_price) }}</strong><br>
+        <span style="opacity:0.7">Your offer must be within this range.</span>
+      </div>
+      <label>
+        Your Offer Price (₹) <span style="color:#e53e3e">*</span>
+        <input type="number" name="offer_price" min="{{ media.min_price }}" max="{{ media.max_price }}" placeholder="e.g. {{ media.min_price }}" required />
+      </label>
+    {% endif %}
+
+    <label>
+      Message to Artist
+      <textarea name="message" rows="4" maxlength="300" placeholder="Introduce yourself and express your interest in this artwork... (max 300 characters)" id="buyMsg"></textarea>
+      <small id="msgCount" style="opacity:0.5;float:right">0 / 300</small>
+    </label>
+
+    <div style="background:#fffbeb;border:1px solid #f6e05e;border-radius:10px;padding:12px;font-size:0.85rem;color:#744210">
+      <i class="fas fa-lock" style="margin-right:6px"></i>
+      <strong>Contact information is hidden</strong> until both parties confirm a deal agreement.
+    </div>
+
+    <button type="submit" class="button buy-request-btn" id="buySubmitBtn">
+      <i class="fas fa-hand-holding-heart"></i> Send Buy Request
+    </button>
+  </form>
+</section>
+
+<script>
+const msg = document.getElementById('buyMsg');
+const count = document.getElementById('msgCount');
+msg.addEventListener('input', () => count.textContent = msg.value.length + ' / 300');
+
+document.getElementById('buyRequestForm').addEventListener('submit', function() {
+  const btn = document.getElementById('buySubmitBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending…';
+});
+</script>
+{% endblock %}

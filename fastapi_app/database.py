@@ -21,10 +21,18 @@ def init_db() -> None:
                 conn.execute(text("ALTER TABLE media_items ADD COLUMN tags VARCHAR(255)"))
             if "uploader_id" not in current_columns:
                 conn.execute(text("ALTER TABLE media_items ADD COLUMN uploader_id INTEGER"))
+            if "sale_status" not in current_columns:
+                conn.execute(text("ALTER TABLE media_items ADD COLUMN sale_status VARCHAR(20) DEFAULT 'showcase'"))
+            if "fixed_price" not in current_columns:
+                conn.execute(text("ALTER TABLE media_items ADD COLUMN fixed_price INTEGER"))
+            if "min_price" not in current_columns:
+                conn.execute(text("ALTER TABLE media_items ADD COLUMN min_price INTEGER"))
+            if "max_price" not in current_columns:
+                conn.execute(text("ALTER TABLE media_items ADD COLUMN max_price INTEGER"))
+            if "artwork_status" not in current_columns:
+                conn.execute(text("ALTER TABLE media_items ADD COLUMN artwork_status VARCHAR(20) DEFAULT 'available'"))
     if "users" in inspector.get_table_names():
         user_columns = [column["name"] for column in inspector.get_columns("users")]
         with engine.begin() as conn:
             if "is_admin" not in user_columns:
                 conn.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT 0"))
-            if "is_banned" not in user_columns:
-                conn.execute(text("ALTER TABLE users ADD COLUMN is_banned BOOLEAN DEFAULT 0"))
