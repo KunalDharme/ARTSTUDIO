@@ -603,3 +603,59 @@ def update_request_status(db: Session, request_id: int, status: str) -> models.B
     db.commit()
     db.refresh(req)
     return req
+
+
+# ----------------- Deals -----------------
+def create_deal(db: Session, buy_request_id: int, media_id: int, buyer_id: int, artist_id: int, current_price: int | None, last_actor_id: int | None = None) -> models.Deal:
+    deal = models.Deal(
+        buy_request_id=buy_request_id,
+        media_id=media_id,
+        buyer_id=buyer_id,
+        artist_id=artist_id,
+        current_price=current_price,
+        last_actor_id=last_actor_id,
+    )
+    db.add(deal)
+    db.commit()
+    db.refresh(deal)
+    # Log opening event
+    add_deal_event(db, deal.id, artist_id, "deal_created", message="Deal room opened.")
+    return deal
+
+
+def get_deal(db: Session, deal_id: int) -> models.Deal | None:
+    return db.query(models.Deal).filter(models.Deal.id == deal_id).first()
+
+
+def get_deal_by_request(db: Session, buy_request_id: int) -> models.Deal | None:
+    return db.query(models.Deal).filter(models.Deal.buy_request_id == buy_request_id).first()
+
+
+def get_deals_for_user(db: Session, user_id: int) -> list[models.Deal]:
+    return (
+        db.query(models.Deal)
+        .filter((models.Deal.buyer_id == user_id) | (models.Deal.artist_id == user_id))
+        .order_by(models.Deal.updated_at.desc())
+        .all()
+    )
+
+
+def add_deal_event(db: Session, deal_id: int, actor_id: int, kind: str, amount: int | None = None, message: str | None = None) -> models.DealEvent:
+    ev = models.DealEvent(deal_id=deal_id, actor_id=actor_id, kind=kind, amount=amount, message=message)
+    db.add(ev)
+    db.commit()
+    db.refresh(ev)
+    return ev
+
+
+def get_deal_events(db: Session, deal_id: int) -> list[models.DealEvent]:
+    return db.query(models.DealEvent).filter(models.DealEvent.deal_id == deal_id).order_by(models.DealEvent.created_at.asc()).all()
+
+
+def update_deal(db: Session, deal: models.Deal, **kwargs) -> models.Deal:
+    for k, v in kwargs.items():
+        setattr(deal, k, v)
+    db.add(deal)
+    db.commit()
+    db.refresh(deal)
+    return deal

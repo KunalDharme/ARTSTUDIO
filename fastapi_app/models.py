@@ -34,6 +34,8 @@ class User(Base):
     bio = Column(Text, nullable=True)
     is_admin = Column(Boolean, default=False, nullable=False)
     is_banned = Column(Boolean, default=False, nullable=False)
+    whatsapp = Column(String(30), nullable=True)
+    telegram = Column(String(60), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -111,3 +113,33 @@ class BuyRequest(Base):
     status = Column(String(20), default="pending")          # pending | accepted | rejected | cancelled
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class Deal(Base):
+    __tablename__ = "deals"
+
+    id = Column(Integer, primary_key=True, index=True)
+    buy_request_id = Column(Integer, nullable=False, unique=True, index=True)
+    media_id = Column(Integer, nullable=False, index=True)
+    buyer_id = Column(Integer, nullable=False, index=True)
+    artist_id = Column(Integer, nullable=False, index=True)
+    current_price = Column(Integer, nullable=True)
+    last_actor_id = Column(Integer, nullable=True)   # who made the last offer/counter
+    status = Column(String(30), default="negotiating")   # negotiating | agreed | buyer_confirmed | artist_confirmed | completed | cancelled
+    buyer_confirmed = Column(Boolean, default=False)
+    artist_confirmed = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class DealEvent(Base):
+    __tablename__ = "deal_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    deal_id = Column(Integer, nullable=False, index=True)
+    actor_id = Column(Integer, nullable=False)
+    kind = Column(String(30), nullable=False)
+    # offer | counter | question | answer | accept_price | cancel | deal_created | buyer_confirmed | artist_confirmed | completed
+    amount = Column(Integer, nullable=True)              # for offer/counter events
+    message = Column(String(200), nullable=True)         # optional note
+    created_at = Column(DateTime, default=datetime.utcnow)

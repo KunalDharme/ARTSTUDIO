@@ -36,3 +36,14 @@ def init_db() -> None:
         with engine.begin() as conn:
             if "is_admin" not in user_columns:
                 conn.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT 0"))
+            if "is_banned" not in user_columns:
+                conn.execute(text("ALTER TABLE users ADD COLUMN is_banned BOOLEAN DEFAULT 0"))
+            if "whatsapp" not in user_columns:
+                conn.execute(text("ALTER TABLE users ADD COLUMN whatsapp VARCHAR(30)"))
+            if "telegram" not in user_columns:
+                conn.execute(text("ALTER TABLE users ADD COLUMN telegram VARCHAR(60)"))
+    if "deals" in inspector.get_table_names():
+        deal_columns = [column["name"] for column in inspector.get_columns("deals")]
+        with engine.begin() as conn:
+            if "last_actor_id" not in deal_columns:
+                conn.execute(text("ALTER TABLE deals ADD COLUMN last_actor_id INTEGER"))

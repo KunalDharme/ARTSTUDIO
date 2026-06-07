@@ -58,7 +58,11 @@
     <div class="media-meta">
       <a href="/watch/{{ media.id }}"><h3>{{ media.title }}</h3></a>
       <p><a href="/profile/{{ media.uploader }}" class="uploader-link">{{ media.uploader }}</a> · {{ media.views }} views</p>
-      {% if media.sale_status == 'fixed' and media.fixed_price %}
+      {% if media.artwork_status == 'sold' %}
+        <div class="price-tag artwork-sold-tag"><i class="fas fa-circle-check"></i> Sold · ₹{{ "{:,}".format(media.fixed_price) if media.fixed_price else '' }}</div>
+      {% elif media.artwork_status == 'reserved' %}
+        <div class="price-tag artwork-reserved-tag"><i class="fas fa-clock"></i> Reserved</div>
+      {% elif media.sale_status == 'fixed' and media.fixed_price %}
         <div class="price-tag price-fixed"><i class="fas fa-tag"></i> ₹{{ "{:,}".format(media.fixed_price) }} Fixed</div>
       {% elif media.sale_status == 'negotiable' and media.min_price and media.max_price %}
         <div class="price-tag price-negotiable"><i class="fas fa-handshake"></i> ₹{{ "{:,}".format(media.min_price) }} – ₹{{ "{:,}".format(media.max_price) }}</div>

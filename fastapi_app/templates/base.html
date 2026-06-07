@@ -153,6 +153,25 @@
 
       <hr class="settings-divider"/>
 
+      <p class="settings-section-label">Contact Info for Deals</p>
+      <p style="font-size:0.8rem;opacity:0.6;margin-bottom:12px">Only revealed to the other party after a deal receipt is fully confirmed.</p>
+      <form action="/settings/contact" method="post" class="settings-form" id="contactForm">
+        <div class="settings-field">
+          <label>WhatsApp Number</label>
+          <input type="text" name="whatsapp" placeholder="+91 98765 43210"
+                 value="{{ current_user.whatsapp or '' }}" />
+        </div>
+        <div class="settings-field">
+          <label>Telegram Username</label>
+          <input type="text" name="telegram" placeholder="@yourusername"
+                 value="{{ current_user.telegram or '' }}" />
+        </div>
+        <button type="submit" class="button settings-submit">Save Contact Info</button>
+        <p class="settings-feedback" id="contactFeedback"></p>
+      </form>
+
+      <hr class="settings-divider"/>
+
       <p class="settings-section-label">Profile</p>
       <div class="settings-links">
         <a href="/profile/{{ current_user.username }}/edit" class="button settings-link-btn">
@@ -324,6 +343,7 @@
 
     ajaxForm('emailForm', 'emailFeedback');
     ajaxForm('passwordForm', 'passwordFeedback');
+    ajaxForm('contactForm', 'contactFeedback');
 
     // Delete account confirm
     const deleteAccountBtn = document.getElementById('deleteAccountBtn');
@@ -368,6 +388,12 @@
       if (kind === 'buy_request')      return '<i class="fas fa-hand-holding-heart" style="color:#d69e2e"></i>';
       if (kind === 'request_accepted') return '<i class="fas fa-circle-check" style="color:#38a169"></i>';
       if (kind === 'request_rejected') return '<i class="fas fa-circle-xmark" style="color:#e53e3e"></i>';
+      if (kind === 'deal_offer')       return '<i class="fas fa-scale-balanced" style="color:#9f7aea"></i>';
+      if (kind === 'deal_agreed')      return '<i class="fas fa-handshake" style="color:#38a169"></i>';
+      if (kind === 'deal_question')    return '<i class="fas fa-circle-question" style="color:#4299e1"></i>';
+      if (kind === 'deal_answer')      return '<i class="fas fa-reply" style="color:#4299e1"></i>';
+      if (kind === 'deal_cancelled')   return '<i class="fas fa-ban" style="color:#e53e3e"></i>';
+      if (kind === 'deal_confirmed')   return '<i class="fas fa-file-contract" style="color:#38a169"></i>';
       return '<i class="fas fa-bell"></i>';
     }
 
@@ -378,6 +404,12 @@
       if (n.kind === 'buy_request')      return `<strong>${n.actor}</strong> sent a buy request for <em>${n.media_title || 'your artwork'}</em>`;
       if (n.kind === 'request_accepted') return `Your buy request for <em>${n.media_title || 'an artwork'}</em> was <strong>accepted</strong>`;
       if (n.kind === 'request_rejected') return `Your buy request for <em>${n.media_title || 'an artwork'}</em> was <strong>declined</strong>`;
+      if (n.kind === 'deal_offer')       return `<strong>${n.actor}</strong> made a new offer on <em>${n.media_title || 'your deal'}</em>`;
+      if (n.kind === 'deal_agreed')      return `<strong>${n.actor}</strong> accepted the price on <em>${n.media_title || 'your deal'}</em>`;
+      if (n.kind === 'deal_question')    return `<strong>${n.actor}</strong> asked a question about <em>${n.media_title || 'your artwork'}</em>`;
+      if (n.kind === 'deal_answer')      return `<strong>${n.actor}</strong> answered your question`;
+      if (n.kind === 'deal_cancelled')   return `<strong>${n.actor}</strong> cancelled the deal for <em>${n.media_title || 'an artwork'}</em>`;
+      if (n.kind === 'deal_confirmed')   return `<strong>${n.actor}</strong> confirmed the deal receipt for <em>${n.media_title || 'an artwork'}</em>`;
       return `<strong>${n.actor}</strong> did something`;
     }
 
@@ -389,16 +421,22 @@
         list.innerHTML = '<div style="padding:2rem;text-align:center;opacity:0.5">No notifications yet.</div>';
         return;
       }
-      list.innerHTML = data.notifications.map(n => `
+      list.innerHTML = data.notifications.map(n => {
+        let url = '#';
+        if (n.kind === 'follow') url = `/profile/${n.actor}`;
+        else if (n.kind === 'like' || n.kind === 'comment') url = `/watch/${n.media_id}`;
+        else if (['buy_request','request_accepted','request_rejected'].includes(n.kind)) url = '/requests';
+        else if (['deal_offer','deal_agreed','deal_question','deal_answer','deal_cancelled'].includes(n.kind)) url = '/requests';
+        return `
         <div class="notif-item ${n.is_read ? 'notif-read' : 'notif-unread'}"
-             ${n.media_id ? `onclick="window.location='/watch/${n.media_id}'"` : n.kind === 'follow' ? `onclick="window.location='/profile/${n.actor}'"` : ''}>
+             onclick="window.location='${url}'" style="cursor:pointer">
           <span class="notif-icon">${kindIcon(n.kind)}</span>
           <div class="notif-body">
             <p>${kindText(n)}</p>
             <small>${n.created_at}</small>
           </div>
         </div>
-      `).join('');
+      `}).join('');
       // Update badge
       if (notifBadge) {
         notifBadge.textContent = data.unread;

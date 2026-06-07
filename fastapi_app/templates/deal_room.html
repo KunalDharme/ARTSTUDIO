@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="container" style="max-width:760px">
+
+  <!-- Deal Header -->
+  <div class="deal-header">
+    <div style="display:flex;gap:14px;align-items:center">
+      {% if media %}
+        {% if media.media_type == 'video' %}
+          <div style="width:72px;height:72px;border-radius:10px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <i class="fas fa-play" style="opacity:0.5;font-size:1.4rem"></i>
+          </div>
+        {% else %}
+          <img src="/uploads/{{ media.filename }}" alt="{{ media.title }}"
+               style="width:72px;height:72px;object-fit:cover;border-radius:10px;flex-shrink:0" />
+        {% endif %}
+        <div>
+          <h2 style="margin:0 0 4px">{{ media.title }}</h2>
+          <p style="margin:0;opacity:0.6;font-size:0.85rem">
+            <a href="/profile/{{ artist.username if artist else '#' }}" class="uploader-link">{{ artist.username if artist else 'Artist' }}</a>
+            (artist) ·
+            <a href="/profile/{{ buyer.username if buyer else '#' }}" class="uploader-link">{{ buyer.username if buyer else 'Buyer' }}</a>
+            (buyer)
+          </p>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap">
+            <span class="deal-status-badge status-{{ deal.status }}">{{ deal.status.replace('_', ' ').capitalize() }}</span>
+            {% if deal.current_price %}
+              <span style="font-weight:700;font-size:0.95rem">Current: ₹{{ "{:,}".format(deal.current_price) }}</span>
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+    <a href="/requests" style="font-size:0.85rem;opacity:0.6">← Back to Requests</a>
+  </div>
+
+  <!-- Contact protection notice -->
+  {% if deal.status != 'completed' %}
+  <div class="deal-notice">
+    <i class="fas fa-lock"></i>
+    <span>Contact information is hidden until both parties confirm the deal receipt.</span>
+  </div>
+  {% endif %}
+
+  <!-- Deal Timeline -->
+  <div class="deal-timeline">
+    {% for item in events %}
+      <div class="deal-event kind-{{ item.ev.kind }}">
+        <div class="deal-event-icon">
+          {% if item.ev.kind == 'deal_created' %}<i class="fas fa-door-open"></i>
+          {% elif item.ev.kind == 'offer' %}<i class="fas fa-scale-balanced"></i>
+          {% elif item.ev.kind == 'counter' %}<i class="fas fa-arrows-rotate"></i>
+          {% elif item.ev.kind == 'accept_price' %}<i class="fas fa-handshake"></i>
+          {% elif item.ev.kind == 'question' %}<i class="fas fa-circle-question"></i>
+          {% elif item.ev.kind == 'answer' %}<i class="fas fa-reply"></i>
+          {% elif item.ev.kind == 'cancel' %}<i class="fas fa-ban"></i>
+          {% elif item.ev.kind == 'buyer_confirmed' %}<i class="fas fa-user-check"></i>
+          {% elif item.ev.kind == 'artist_confirmed' %}<i class="fas fa-palette"></i>
+          {% elif item.ev.kind == 'completed' %}<i class="fas fa-circle-check"></i>
+          {% else %}<i class="fas fa-circle"></i>{% endif %}
+        </div>
+        <div class="deal-event-body">
+          <div class="deal-event-meta">
+            <strong>{{ item.actor.username if item.actor else 'System' }}</strong>
+            <small>{{ item.ev.created_at.strftime('%b %d, %H:%M') }}</small>
+          </div>
+          {% if item.ev.kind == 'offer' %}
+            <p>Offered <strong>₹{{ "{:,}".format(item.ev.amount) }}</strong>
+            {% if item.ev.message %} — "{{ item.ev.message }}"{% endif %}</p>
+          {% elif item.ev.kind == 'counter' %}
+            <p>Counter offer: <strong>₹{{ "{:,}".format(item.ev.amount) }}</strong>
+            {% if item.ev.message %} — "{{ item.ev.message }}"{% endif %}</p>
+          {% elif item.ev.kind == 'accept_price' %}
+            <p>✅ {{ item.ev.message }}</p>
+          {% elif item.ev.kind == 'question' %}
+            <p class="deal-question">❓ {{ item.ev.message }}</p>
+          {% elif item.ev.kind == 'answer' %}
+            <p class="deal-answer">💬 {{ item.ev.message }}</p>
+          {% elif item.ev.kind == 'cancel' %}
+            <p style="color:#e53e3e">🚫 {{ item.ev.message }}</p>
+          {% else %}
+            <p>{{ item.ev.message or item.ev.kind.replace('_', ' ').capitalize() }}</p>
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <!-- Action panels — only show if deal is active -->
+  {% if deal.status not in ('cancelled', 'completed') %}
+  <div class="deal-actions-panel">
+
+    {% if is_buyer %}
+    <!-- BUYER ACTIONS -->
+    <div class="deal-action-group">
+      <p class="deal-action-label">Your actions</p>
+
+      {% if deal.status == 'negotiating' %}
+      <!-- Accept current price — only shown to the party who did NOT make the last offer -->
+      {% if deal.current_price and deal.last_actor_id != current_user.id %}
+      <form action="/deal/{{ deal.id }}/accept-price" method="post" style="display:inline"
+            onsubmit="return confirm('Accept ₹{{ '{:,}'.format(deal.current_price) }} as the final price?')">
+        <button type="submit" class="button" style="background:#38a169;color:#fff">
+          <i class="fas fa-check"></i> Accept ₹{{ "{:,}".format(deal.current_price) }}
+        </button>
+      </form>
+      {% elif deal.current_price and deal.last_actor_id == current_user.id %}
+      <div style="font-size:0.85rem;opacity:0.6;padding:8px 12px;background:var(--surface-2);border-radius:8px">
+        <i class="fas fa-clock"></i> Waiting for the other party to respond to your offer of ₹{{ "{:,}".format(deal.current_price) }}…
+      </div>
+      {% endif %}
+
+      <!-- Make offer -->
+      <details class="deal-details-form">
+        <summary class="button" style="cursor:pointer;list-style:none">
+          <i class="fas fa-scale-balanced"></i>
+          {% if deal.current_price %}Make Counter Offer{% else %}Make Offer{% endif %}
+        </summary>
+        <form action="/deal/{{ deal.id }}/offer" method="post" class="deal-inline-form">
+          <input type="number" name="amount" min="1" placeholder="₹ Amount" required />
+          <input type="text" name="message" maxlength="200" placeholder="Optional note (max 200 chars)" />
+          <button type="submit" class="button">Send Offer</button>
+        </form>
+      </details>
+      {% endif %}
+
+      <!-- Ask question -->
+      <details class="deal-details-form">
+        <summary class="button" style="cursor:pointer;list-style:none">
+          <i class="fas fa-circle-question"></i> Ask Question
+        </summary>
+        <form action="/deal/{{ deal.id }}/question" method="post" class="deal-inline-form">
+          <select name="question_key" id="qSelect" style="padding:8px;border-radius:8px;border:1px solid var(--surface-2);background:var(--surface-1);color:inherit">
+            {% for key, text in predefined_questions %}
+              <option value="{{ key }}">{{ text }}</option>
+            {% endfor %}
+          </select>
+          <input type="text" name="custom_message" maxlength="200" placeholder="Custom question (if you selected 'Other')" id="customQ" style="display:none" />
+          <button type="submit" class="button">Send Question</button>
+        </form>
+      </details>
+
+      <!-- Cancel -->
+      {% if deal.status == 'negotiating' %}
+      <form action="/deal/{{ deal.id }}/cancel" method="post" style="display:inline"
+            onsubmit="return confirm('Cancel this deal? This cannot be undone.')">
+        <button type="submit" class="button button-danger" style="padding:8px 16px;font-size:0.85rem">
+          <i class="fas fa-ban"></i> Cancel Deal
+        </button>
+      </form>
+      {% endif %}
+    </div>
+
+    {% else %}
+    <!-- ARTIST ACTIONS -->
+    <div class="deal-action-group">
+      <p class="deal-action-label">Your actions</p>
+
+      {% if deal.status == 'negotiating' %}
+      <!-- Accept current price — only shown to other party -->
+      {% if deal.current_price and deal.last_actor_id != current_user.id %}
+      <form action="/deal/{{ deal.id }}/accept-price" method="post" style="display:inline"
+            onsubmit="return confirm('Accept ₹{{ '{:,}'.format(deal.current_price) }} as the final price?')">
+        <button type="submit" class="button" style="background:#38a169;color:#fff">
+          <i class="fas fa-check"></i> Accept ₹{{ "{:,}".format(deal.current_price) }}
+        </button>
+      </form>
+      {% elif deal.current_price and deal.last_actor_id == current_user.id %}
+      <div style="font-size:0.85rem;opacity:0.6;padding:8px 12px;background:var(--surface-2);border-radius:8px">
+        <i class="fas fa-clock"></i> Waiting for buyer to respond to your counter of ₹{{ "{:,}".format(deal.current_price) }}…
+      </div>
+      {% endif %}
+
+      <!-- Counter offer -->
+      <details class="deal-details-form">
+        <summary class="button" style="cursor:pointer;list-style:none">
+          <i class="fas fa-arrows-rotate"></i> Counter Offer
+        </summary>
+        <form action="/deal/{{ deal.id }}/offer" method="post" class="deal-inline-form">
+          <input type="number" name="amount" min="1" placeholder="₹ Your counter price" required />
+          <input type="text" name="message" maxlength="200" placeholder="Optional note" />
+          <button type="submit" class="button">Send Counter</button>
+        </form>
+      </details>
+      {% endif %}
+
+      <!-- Answer question -->
+      <details class="deal-details-form">
+        <summary class="button" style="cursor:pointer;list-style:none">
+          <i class="fas fa-reply"></i> Answer Question
+        </summary>
+        <form action="/deal/{{ deal.id }}/answer" method="post" class="deal-inline-form">
+          <select name="answer_text" style="padding:8px;border-radius:8px;border:1px solid var(--surface-2);background:var(--surface-1);color:inherit">
+            <option value="">— Select a quick reply —</option>
+            {% for ans in predefined_answers %}
+              <option value="{{ ans }}">{{ ans }}</option>
+            {% endfor %}
+          </select>
+          <input type="text" name="custom_answer" maxlength="200" placeholder="Or type a custom answer" />
+          <button type="submit" class="button">Send Answer</button>
+        </form>
+      </details>
+
+      <!-- Cancel -->
+      {% if deal.status == 'negotiating' %}
+      <form action="/deal/{{ deal.id }}/cancel" method="post" style="display:inline"
+            onsubmit="return confirm('Cancel this deal?')">
+        <button type="submit" class="button button-danger" style="padding:8px 16px;font-size:0.85rem">
+          <i class="fas fa-ban"></i> Cancel Deal
+        </button>
+      </form>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Create Deal Receipt — shown when agreed -->
+    {% if deal.status == 'agreed' %}
+    <div class="deal-agreed-banner">
+      <i class="fas fa-handshake" style="font-size:1.5rem;color:#38a169"></i>
+      <div>
+        <strong>Both parties have agreed on ₹{{ "{:,}".format(deal.current_price) }}</strong>
+        <p style="margin:4px 0 0;font-size:0.85rem;opacity:0.8">Ready to create the deal receipt and unlock contact information.</p>
+      </div>
+      <a href="/deal/{{ deal.id }}/receipt" class="button" style="background:#38a169;color:#fff;white-space:nowrap">
+        <i class="fas fa-file-contract"></i> Create Deal Receipt
+      </a>
+    </div>
+    {% endif %}
+
+  </div>
+  {% endif %}
+
+  {% if deal.status == 'cancelled' %}
+  <div class="deal-closed-banner" style="background:#fed7d7;color:#742a2a">
+    <i class="fas fa-ban"></i> This deal has been cancelled.
+  </div>
+  {% elif deal.status == 'completed' %}
+  <div class="deal-closed-banner" style="background:#c6f6d5;color:#22543d">
+    <i class="fas fa-circle-check"></i> Deal completed. Contact information has been exchanged.
+  </div>
+  {% endif %}
+
+</section>
+
+<script>
+// Show custom question input when "Other" is selected
+var qSelect = document.getElementById('qSelect');
+if (qSelect) {
+  qSelect.addEventListener('change', function() {
+    document.getElementById('customQ').style.display = this.value === 'other' ? 'block' : 'none';
+  });
+}
+</script>
+{% endblock %}

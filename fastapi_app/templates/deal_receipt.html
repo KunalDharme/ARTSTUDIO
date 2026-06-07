@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="container" style="max-width:640px">
+
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:1.5rem;flex-wrap:wrap">
+    <a href="/deal/{{ deal.id }}" style="opacity:0.6;font-size:0.9rem">← Back to Deal Room</a>
+    {% if show_contact %}
+    <a href="/deal/{{ deal.id }}/receipt/download"
+       class="button"
+       style="background:#276749;color:#fff;display:inline-flex;align-items:center;gap:6px;margin-left:auto">
+      <i class="fas fa-file-pdf"></i> Download PDF Receipt
+    </a>
+    {% endif %}
+  </div>
+
+  <!-- Receipt Card -->
+  <div class="receipt-card">
+    <div class="receipt-header">
+      <div style="display:flex;align-items:center;gap:12px">
+        <i class="fas fa-file-contract" style="font-size:1.5rem;opacity:0.8"></i>
+        <div>
+          <h2 style="margin:0;font-size:1.1rem;letter-spacing:0.05em">ART DEAL RECEIPT</h2>
+          <p style="margin:2px 0 0;font-size:0.8rem;opacity:0.6">Deal ID: ART-{{ '%06d' % deal.id }}</p>
+        </div>
+      </div>
+      <span class="deal-status-badge status-{{ deal.status }}" style="font-size:0.8rem">
+        {{ deal.status.replace('_',' ').title() }}
+      </span>
+    </div>
+
+    <div class="receipt-body">
+      <!-- Artwork -->
+      <div class="receipt-row">
+        <div class="receipt-label">Artwork</div>
+        <div class="receipt-value">
+          <div style="display:flex;gap:12px;align-items:center">
+            {% if media %}
+              {% if media.media_type == 'video' %}
+                <div style="width:48px;height:48px;border-radius:8px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                  <i class="fas fa-play" style="opacity:0.5"></i>
+                </div>
+              {% else %}
+                <img src="/uploads/{{ media.filename }}" style="width:48px;height:48px;object-fit:cover;border-radius:8px;flex-shrink:0" />
+              {% endif %}
+              <strong>{{ media.title }}</strong>
+            {% else %}
+              <span style="opacity:0.5">Unknown</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="receipt-row">
+        <div class="receipt-label">Artist</div>
+        <div class="receipt-value"><strong>{{ artist.username if artist else '—' }}</strong></div>
+      </div>
+
+      <div class="receipt-row">
+        <div class="receipt-label">Buyer</div>
+        <div class="receipt-value"><strong>{{ buyer.username if buyer else '—' }}</strong></div>
+      </div>
+
+      <div class="receipt-row">
+        <div class="receipt-label">Final Price</div>
+        <div class="receipt-value" style="font-size:1.2rem;font-weight:800;color:var(--accent,#e60023)">
+          ₹{{ "{:,}".format(deal.current_price) if deal.current_price else '—' }}
+        </div>
+      </div>
+
+      <div class="receipt-row">
+        <div class="receipt-label">Created On</div>
+        <div class="receipt-value">{{ deal.created_at.strftime('%d %B %Y') }}</div>
+      </div>
+
+      <div class="receipt-row">
+        <div class="receipt-label">Status</div>
+        <div class="receipt-value">
+          <div style="display:flex;gap:12px;flex-wrap:wrap">
+            <span style="font-size:0.85rem">
+              {% if deal.buyer_confirmed %}✅{% else %}⬜{% endif %} Buyer confirmed
+            </span>
+            <span style="font-size:0.85rem">
+              {% if deal.artist_confirmed %}✅{% else %}⬜{% endif %} Artist confirmed
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Contact Section -->
+    <div class="receipt-contact-section">
+      {% if show_contact %}
+        <div class="contact-unlocked">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+            <i class="fas fa-lock-open" style="color:#38a169;font-size:1.1rem"></i>
+            <strong style="color:#38a169">Contact Information Unlocked</strong>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <!-- Artist contact -->
+            <div>
+              <p style="font-size:0.78rem;text-transform:uppercase;opacity:0.5;margin:0 0 6px">Artist — {{ artist.username if artist else '' }}</p>
+              {% if artist and artist.whatsapp %}
+                <p style="margin:0"><i class="fab fa-whatsapp" style="color:#25d366"></i> {{ artist.whatsapp }}</p>
+              {% endif %}
+              {% if artist and artist.telegram %}
+                <p style="margin:0"><i class="fab fa-telegram" style="color:#229ed9"></i> {{ artist.telegram }}</p>
+              {% endif %}
+              {% if artist and artist.email %}
+                <p style="margin:0"><i class="fas fa-envelope"></i> {{ artist.email }}</p>
+              {% endif %}
+              {% if artist and not artist.whatsapp and not artist.telegram and not artist.email %}
+                <p style="opacity:0.5;font-size:0.85rem;margin:0">No contact info provided.</p>
+              {% endif %}
+            </div>
+            <hr style="border-color:var(--surface-2);margin:4px 0">
+            <!-- Buyer contact -->
+            <div>
+              <p style="font-size:0.78rem;text-transform:uppercase;opacity:0.5;margin:0 0 6px">Buyer — {{ buyer.username if buyer else '' }}</p>
+              {% if buyer and buyer.whatsapp %}
+                <p style="margin:0"><i class="fab fa-whatsapp" style="color:#25d366"></i> {{ buyer.whatsapp }}</p>
+              {% endif %}
+              {% if buyer and buyer.telegram %}
+                <p style="margin:0"><i class="fab fa-telegram" style="color:#229ed9"></i> {{ buyer.telegram }}</p>
+              {% endif %}
+              {% if buyer and buyer.email %}
+                <p style="margin:0"><i class="fas fa-envelope"></i> {{ buyer.email }}</p>
+              {% endif %}
+              {% if buyer and not buyer.whatsapp and not buyer.telegram and not buyer.email %}
+                <p style="opacity:0.5;font-size:0.85rem;margin:0">No contact info provided.</p>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      {% else %}
+        <div class="contact-locked">
+          <i class="fas fa-lock" style="font-size:1.1rem;opacity:0.6"></i>
+          <div>
+            <strong>Contact Information Hidden</strong>
+            <p style="margin:4px 0 0;font-size:0.85rem;opacity:0.7">
+              Contact details will be revealed once both parties confirm this receipt.
+            </p>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Platform Notice -->
+    <div class="receipt-notice">
+      <p style="font-weight:700;margin:0 0 6px;font-size:0.85rem">Platform Notice</p>
+      <p style="margin:0;font-size:0.8rem;line-height:1.6">
+        This Deal Receipt records the agreement details shared between the buyer and artist through this platform.
+        The platform does not process payments, hold funds, arrange shipping, verify artwork authenticity, or
+        guarantee delivery. All arrangements after contact exchange are the responsibility of both parties.
+        By confirming, both parties acknowledge that the platform serves only as a communication and
+        agreement-recording service.
+      </p>
+    </div>
+  </div>
+
+  <!-- Confirmation Section -->
+  {% if deal.status != 'completed' %}
+  <div class="receipt-confirm-section">
+    {% if is_buyer and not deal.buyer_confirmed %}
+      <p style="font-weight:700;margin-bottom:12px">Buyer Confirmation</p>
+      <form action="/deal/{{ deal.id }}/confirm" method="post" id="confirmForm">
+        <label class="confirm-checkbox">
+          <input type="checkbox" id="chk1" required /> I confirm the artwork details.
+        </label>
+        <label class="confirm-checkbox">
+          <input type="checkbox" id="chk2" required /> I confirm the final agreed price of
+          <strong>₹{{ "{:,}".format(deal.current_price) if deal.current_price else '—' }}</strong>.
+        </label>
+        <label class="confirm-checkbox">
+          <input type="checkbox" id="chk3" required /> I have read and understand the Platform Notice above.
+        </label>
+        <button type="submit" class="button" id="confirmBtn" disabled
+                style="background:#38a169;color:#fff;margin-top:12px">
+          <i class="fas fa-signature"></i> Confirm as Buyer
+        </button>
+      </form>
+    {% elif not is_buyer and not deal.artist_confirmed %}
+      <p style="font-weight:700;margin-bottom:12px">Artist Confirmation</p>
+      <form action="/deal/{{ deal.id }}/confirm" method="post" id="confirmForm">
+        <label class="confirm-checkbox">
+          <input type="checkbox" id="chk1" required /> I confirm the artwork details.
+        </label>
+        <label class="confirm-checkbox">
+          <input type="checkbox" id="chk2" required /> I confirm the final agreed price of
+          <strong>₹{{ "{:,}".format(deal.current_price) if deal.current_price else '—' }}</strong>.
+        </label>
+        <label class="confirm-checkbox">
+          <input type="checkbox" id="chk3" required /> I have read and understand the Platform Notice above.
+        </label>
+        <button type="submit" class="button" id="confirmBtn" disabled
+                style="background:#38a169;color:#fff;margin-top:12px">
+          <i class="fas fa-signature"></i> Confirm as Artist
+        </button>
+      </form>
+    {% else %}
+      <div style="background:var(--surface-2);border-radius:12px;padding:16px;text-align:center;opacity:0.7">
+        <i class="fas fa-clock"></i> You have confirmed. Waiting for the other party to confirm.
+      </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+</section>
+
+<script>
+// Enable confirm button only when all checkboxes checked
+var chk1 = document.getElementById('chk1');
+var chk2 = document.getElementById('chk2');
+var chk3 = document.getElementById('chk3');
+var btn  = document.getElementById('confirmBtn');
+
+function checkAll() {
+  if (chk1 && chk2 && chk3 && btn) {
+    btn.disabled = !(chk1.checked && chk2.checked && chk3.checked);
+  }
+}
+if (chk1) { chk1.addEventListener('change', checkAll); chk2.addEventListener('change', checkAll); chk3.addEventListener('change', checkAll); }
+
+// Double submit guard
+var confirmForm = document.getElementById('confirmForm');
+if (confirmForm) {
+  confirmForm.addEventListener('submit', function() {
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Confirming…'; }
+  });
+}
+</script>
+{% endblock %}

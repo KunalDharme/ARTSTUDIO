@@ -411,6 +411,20 @@ def delete_media(media_id: int, request: Request, db: Session = Depends(get_db))
     return redirect_with_flash("/dashboard", "Media deleted.", "success")
 
 
+@app.post("/media/{media_id}/mark-sold")
+def mark_media_sold(media_id: int, request: Request, db: Session = Depends(get_db)):
+    current_user = get_current_user(request, db)
+    if not current_user:
+        return redirect_with_flash("/login", "Please sign in.", "info")
+    media_item = crud.get_media_item(db, media_id)
+    if not media_item or media_item.uploader_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Permission denied.")
+    media_item.artwork_status = "sold"
+    db.add(media_item)
+    db.commit()
+    return redirect_with_flash(f"/watch/{media_id}", "Artwork marked as sold.", "success")
+
+
 @app.get("/posts/new")
 def new_post_form(request: Request, db: Session = Depends(get_db)):
     current_user = get_current_user(request, db)
@@ -545,8 +559,282 @@ async def settings_delete_account(
     return response
 
 
+@app.post("/settings/contact")
+async def settings_contact(
+    request: Request,
+    whatsapp: str = Form(""),
+    telegram: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    if not current_user:
+        return JSONResponse({"message": "Not authenticated"}, status_code=401)
+    current_user.whatsapp = whatsapp.strip()[:30] or None
+    current_user.telegram = telegram.strip()[:60] or None
+    db.add(current_user)
+    db.commit()
+    return JSONResponse({"message": "Contact info saved."})
 
-async def upload_post_image(request: Request, file: UploadFile = File(...), db: Session = Depends(get_db)):
+
+# ═══════════════════════════════════════════
+#  STAGE 4 — DEAL RECEIPT
+# ═══════════════════════════════════════════
+
+@app.get("/deal/{deal_id}/receipt/download")
+def download_deal_receipt(deal_id: int, request: Request, db: Session = Depends(get_db)):
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import mm
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+    from io import BytesIO
+
+    current_user = get_current_user(request, db)
+    if not current_user:
+        return redirect_with_flash("/login", "Please sign in.", "info")
+    deal = crud.get_deal(db, deal_id)
+    if not deal or not _deal_access(deal, current_user):
+        raise HTTPException(status_code=403)
+    if not (deal.buyer_confirmed and deal.artist_confirmed):
+        return redirect_with_flash(f"/deal/{deal_id}/receipt", "Receipt only available after both parties confirm.", "info")
+
+    media = crud.get_media_item(db, deal.media_id)
+    buyer = db.query(models.User).filter(models.User.id == deal.buyer_id).first()
+    artist = db.query(models.User).filter(models.User.id == deal.artist_id).first()
+    events = crud.get_deal_events(db, deal_id)
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        rightMargin=20*mm, leftMargin=20*mm,
+        topMargin=20*mm, bottomMargin=20*mm,
+    )
+
+    styles = getSampleStyleSheet()
+    accent = colors.HexColor("#e60023")
+    dark   = colors.HexColor("#1a1a2e")
+    muted  = colors.HexColor("#718096")
+    green  = colors.HexColor("#276749")
+
+    h1  = ParagraphStyle("H1",  parent=styles["Normal"], fontSize=22, textColor=dark,  fontName="Helvetica-Bold", spaceAfter=2)
+    h2  = ParagraphStyle("H2",  parent=styles["Normal"], fontSize=11, textColor=muted, fontName="Helvetica",      spaceAfter=6)
+    h3  = ParagraphStyle("H3",  parent=styles["Normal"], fontSize=10, textColor=dark,  fontName="Helvetica-Bold", spaceBefore=10, spaceAfter=4)
+    body= ParagraphStyle("Body",parent=styles["Normal"], fontSize=9,  textColor=dark,  fontName="Helvetica",      leading=14)
+    sm  = ParagraphStyle("Sm",  parent=styles["Normal"], fontSize=8,  textColor=muted, fontName="Helvetica",      leading=12)
+    ctr = ParagraphStyle("Ctr", parent=styles["Normal"], fontSize=9,  textColor=dark,  fontName="Helvetica",      alignment=TA_CENTER)
+    price_style = ParagraphStyle("Price", parent=styles["Normal"], fontSize=18, textColor=accent, fontName="Helvetica-Bold", alignment=TA_CENTER)
+
+    story = []
+
+    # ── Header ──
+    story.append(Paragraph("ArtStudio", ParagraphStyle("Brand", parent=h1, textColor=accent, fontSize=28)))
+    story.append(Paragraph("Art Deal Receipt", h2))
+    story.append(HRFlowable(width="100%", thickness=2, color=accent, spaceAfter=10))
+
+    # ── Deal ID + Date row ──
+    deal_id_str = f"ART-{deal.id:06d}"
+    header_data = [
+        [Paragraph(f"<b>Deal ID:</b> {deal_id_str}", body),
+         Paragraph(f"<b>Date:</b> {deal.created_at.strftime('%d %B %Y')}", body)],
+        [Paragraph(f"<b>Status:</b> {'Fully Confirmed ✓' if deal.status == 'completed' else deal.status.replace('_',' ').title()}", body),
+         Paragraph(f"<b>Platform:</b> ArtStudio", body)],
+    ]
+    t = Table(header_data, colWidths=[85*mm, 85*mm])
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,-1), colors.HexColor("#f8f9fa")),
+        ("BOX",        (0,0), (-1,-1), 0.5, colors.HexColor("#dee2e6")),
+        ("INNERGRID",  (0,0), (-1,-1), 0.3, colors.HexColor("#dee2e6")),
+        ("TOPPADDING", (0,0), (-1,-1), 6),
+        ("BOTTOMPADDING",(0,0),(-1,-1), 6),
+        ("LEFTPADDING", (0,0), (-1,-1), 8),
+    ]))
+    story.append(t)
+    story.append(Spacer(1, 8*mm))
+
+    # ── Artwork ──
+    story.append(Paragraph("ARTWORK", ParagraphStyle("Label", parent=sm, textColor=muted, fontName="Helvetica-Bold", spaceBefore=0)))
+    art_data = [
+        ["Title",         media.title if media else "—"],
+        ["Description",   (media.description or "No description")[:120] if media else "—"],
+        ["Tags",          (media.tags or "None") if media else "—"],
+        ["Type",          (media.media_type or "—").capitalize() if media else "—"],
+        ["Sale Status",   (media.sale_status or "—").capitalize() if media else "—"],
+    ]
+    art_table = Table(
+        [[Paragraph(f"<b>{r[0]}</b>", body), Paragraph(str(r[1]), body)] for r in art_data],
+        colWidths=[40*mm, 130*mm]
+    )
+    art_table.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,-1), colors.white),
+        ("BOX",        (0,0), (-1,-1), 0.5, colors.HexColor("#dee2e6")),
+        ("INNERGRID",  (0,0), (-1,-1), 0.3, colors.HexColor("#f0f0f0")),
+        ("TOPPADDING", (0,0), (-1,-1), 5),
+        ("BOTTOMPADDING",(0,0),(-1,-1),5),
+        ("LEFTPADDING", (0,0),(-1,-1), 8),
+        ("BACKGROUND", (0,0),(0,-1), colors.HexColor("#f8f9fa")),
+    ]))
+    story.append(art_table)
+    story.append(Spacer(1, 6*mm))
+
+    # ── Parties ──
+    story.append(Paragraph("PARTIES", ParagraphStyle("Label", parent=sm, textColor=muted, fontName="Helvetica-Bold")))
+    parties_data = [
+        [Paragraph("<b>Artist</b>", body), Paragraph("<b>Buyer</b>", body)],
+        [Paragraph(artist.username if artist else "—", body), Paragraph(buyer.username if buyer else "—", body)],
+        [Paragraph(artist.email or "Not provided", sm), Paragraph(buyer.email or "Not provided", sm)],
+        [Paragraph(f"WhatsApp: {artist.whatsapp or 'Not provided'}", sm), Paragraph(f"WhatsApp: {buyer.whatsapp or 'Not provided'}", sm)],
+        [Paragraph(f"Telegram: {artist.telegram or 'Not provided'}", sm), Paragraph(f"Telegram: {buyer.telegram or 'Not provided'}", sm)],
+        [Paragraph(f"Confirmed: {'Yes ✓' if deal.artist_confirmed else 'No'}", sm), Paragraph(f"Confirmed: {'Yes ✓' if deal.buyer_confirmed else 'No'}", sm)],
+    ]
+    pt = Table(parties_data, colWidths=[85*mm, 85*mm])
+    pt.setStyle(TableStyle([
+        ("BOX",         (0,0),(-1,-1), 0.5, colors.HexColor("#dee2e6")),
+        ("INNERGRID",   (0,0),(-1,-1), 0.3, colors.HexColor("#f0f0f0")),
+        ("TOPPADDING",  (0,0),(-1,-1), 5),
+        ("BOTTOMPADDING",(0,0),(-1,-1),5),
+        ("LEFTPADDING", (0,0),(-1,-1), 8),
+        ("BACKGROUND",  (0,0),(-1,0), colors.HexColor("#f8f9fa")),
+        ("FONTNAME",    (0,0),(-1,0), "Helvetica-Bold"),
+    ]))
+    story.append(pt)
+    story.append(Spacer(1, 6*mm))
+
+    # ── Final Price ──
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#dee2e6"), spaceAfter=6))
+    story.append(Paragraph("FINAL AGREED PRICE", ParagraphStyle("Label", parent=sm, textColor=muted, fontName="Helvetica-Bold", alignment=TA_CENTER)))
+    price_str = f"Rs. {deal.current_price:,}" if deal.current_price else "—"
+    story.append(Paragraph(price_str, price_style))
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#dee2e6"), spaceBefore=6, spaceAfter=8))
+
+    # ── Deal Timeline ──
+    story.append(Paragraph("DEAL TIMELINE", ParagraphStyle("Label", parent=sm, textColor=muted, fontName="Helvetica-Bold")))
+    for ev in events:
+        actor = db.query(models.User).filter(models.User.id == ev.actor_id).first()
+        actor_name = actor.username if actor else "System"
+        time_str = ev.created_at.strftime("%d %b %Y, %H:%M")
+        label = ev.kind.replace("_", " ").title()
+        amt = f" · Rs. {ev.amount:,}" if ev.amount else ""
+        msg = f" — {ev.message}" if ev.message else ""
+        story.append(Paragraph(f"<b>{time_str}</b>  [{label}]  {actor_name}{amt}{msg}", sm))
+    story.append(Spacer(1, 6*mm))
+
+    # ── Platform Notice ──
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#dee2e6"), spaceAfter=6))
+    story.append(Paragraph("PLATFORM NOTICE", ParagraphStyle("Label", parent=sm, textColor=muted, fontName="Helvetica-Bold")))
+    notice_text = (
+        "This Deal Receipt records the agreement details shared between the buyer and artist through the ArtStudio platform. "
+        "The platform does not process payments, hold funds, arrange shipping, verify artwork authenticity, or guarantee delivery. "
+        "All payment, shipping, delivery, and communication arrangements after contact exchange are the sole responsibility of the buyer and artist. "
+        "By confirming this deal, both parties acknowledge that ArtStudio serves only as a communication and agreement-recording service. "
+        "This document is not a legal contract and carries no legal liability for ArtStudio or its operators."
+    )
+    story.append(Paragraph(notice_text, sm))
+    story.append(Spacer(1, 6*mm))
+
+    # ── Digital Acknowledgement ──
+    story.append(Paragraph("DIGITAL ACKNOWLEDGEMENT", ParagraphStyle("Label", parent=sm, textColor=muted, fontName="Helvetica-Bold")))
+    ack_data = [
+        [Paragraph("<b>Artist signature</b>", sm), Paragraph("<b>Buyer signature</b>", sm)],
+        [Paragraph(f"{artist.username if artist else '—'}\nConfirmed digitally on ArtStudio\n{deal.updated_at.strftime('%d %B %Y') if deal.updated_at else '—'}", sm),
+         Paragraph(f"{buyer.username if buyer else '—'}\nConfirmed digitally on ArtStudio\n{deal.updated_at.strftime('%d %B %Y') if deal.updated_at else '—'}", sm)],
+    ]
+    at = Table(ack_data, colWidths=[85*mm, 85*mm])
+    at.setStyle(TableStyle([
+        ("BOX",         (0,0),(-1,-1), 0.5, colors.HexColor("#dee2e6")),
+        ("INNERGRID",   (0,0),(-1,-1), 0.3, colors.HexColor("#f0f0f0")),
+        ("TOPPADDING",  (0,0),(-1,-1), 8),
+        ("BOTTOMPADDING",(0,0),(-1,-1),8),
+        ("LEFTPADDING", (0,0),(-1,-1), 8),
+        ("BACKGROUND",  (0,0),(-1,0), colors.HexColor("#f8f9fa")),
+    ]))
+    story.append(at)
+    story.append(Spacer(1, 4*mm))
+
+    # ── Footer ──
+    story.append(HRFlowable(width="100%", thickness=1, color=accent, spaceAfter=4))
+    story.append(Paragraph(
+        f"Generated by ArtStudio · {deal_id_str} · {deal.created_at.strftime('%d %B %Y')} · This is a platform record only.",
+        ParagraphStyle("Footer", parent=sm, alignment=TA_CENTER, textColor=muted)
+    ))
+
+    doc.build(story)
+    buffer.seek(0)
+
+    from fastapi.responses import StreamingResponse
+    filename = f"ArtStudio-Deal-{deal_id_str}.pdf"
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
+@app.get("/deal/{deal_id}/receipt")
+def deal_receipt(deal_id: int, request: Request, db: Session = Depends(get_db)):
+    current_user = get_current_user(request, db)
+    if not current_user:
+        return redirect_with_flash("/login", "Please sign in.", "info")
+    deal = crud.get_deal(db, deal_id)
+    if not deal:
+        raise HTTPException(status_code=404)
+    if not _deal_access(deal, current_user):
+        raise HTTPException(status_code=403)
+    if deal.status not in ("agreed", "buyer_confirmed", "artist_confirmed", "completed"):
+        return redirect_with_flash(f"/deal/{deal_id}", "Both parties must agree on a price before creating the receipt.", "info")
+    media = crud.get_media_item(db, deal.media_id)
+    buyer = db.query(models.User).filter(models.User.id == deal.buyer_id).first()
+    artist = db.query(models.User).filter(models.User.id == deal.artist_id).first()
+    is_buyer = current_user.id == deal.buyer_id
+    # Contact only visible after both confirmed
+    show_contact = deal.status == "completed" or (deal.buyer_confirmed and deal.artist_confirmed)
+    return render_template(
+        request, "deal_receipt.html", db,
+        deal=deal,
+        media=media,
+        buyer=buyer,
+        artist=artist,
+        is_buyer=is_buyer,
+        show_contact=show_contact,
+        current_user=current_user,
+    )
+
+
+@app.post("/deal/{deal_id}/confirm")
+def deal_confirm(deal_id: int, request: Request, db: Session = Depends(get_db)):
+    current_user = get_current_user(request, db)
+    if not current_user:
+        return redirect_with_flash("/login", "Please sign in.", "info")
+    deal = crud.get_deal(db, deal_id)
+    if not deal or not _deal_access(deal, current_user):
+        raise HTTPException(status_code=403)
+    if deal.status == "completed":
+        return redirect_with_flash(f"/deal/{deal_id}/receipt", "Deal already completed.", "info")
+
+    is_buyer = current_user.id == deal.buyer_id
+    if is_buyer and not deal.buyer_confirmed:
+        crud.update_deal(db, deal, buyer_confirmed=True, status="buyer_confirmed")
+        crud.add_deal_event(db, deal_id, current_user.id, "buyer_confirmed", message="Buyer confirmed the deal receipt.")
+        crud.create_notification(db, user_id=deal.artist_id, actor_id=current_user.id, kind="deal_confirmed", media_id=deal.media_id)
+    elif not is_buyer and not deal.artist_confirmed:
+        crud.update_deal(db, deal, artist_confirmed=True, status="artist_confirmed")
+        crud.add_deal_event(db, deal_id, current_user.id, "artist_confirmed", message="Artist confirmed the deal receipt.")
+        crud.create_notification(db, user_id=deal.buyer_id, actor_id=current_user.id, kind="deal_confirmed", media_id=deal.media_id)
+
+    # Reload to check if both confirmed
+    db.refresh(deal)
+    if deal.buyer_confirmed and deal.artist_confirmed:
+        crud.update_deal(db, deal, status="completed")
+        crud.add_deal_event(db, deal_id, current_user.id, "completed", message="Deal fully confirmed. Contact information unlocked.")
+        # Mark artwork as reserved and store agreed price
+        media = crud.get_media_item(db, deal.media_id)
+        if media:
+            media.artwork_status = "reserved"
+            media.fixed_price = deal.current_price  # store agreed price for sold label
+            db.add(media)
+            db.commit()
+
+    return redirect_with_flash(f"/deal/{deal_id}/receipt", "Confirmed! Waiting for the other party." if deal.status != "completed" else "Deal complete! Contact information is now visible.", "success")
     current_user = get_current_user(request, db)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -1006,10 +1294,43 @@ def my_requests(request: Request, db: Session = Depends(get_db)):
         for r in reqs:
             media = crud.get_media_item(db, r.media_id)
             buyer = db.query(models.User).filter(models.User.id == r.buyer_id).first()
-            result.append({"req": r, "media": media, "buyer": buyer})
+            deal = crud.get_deal_by_request(db, r.id)
+            result.append({"req": r, "media": media, "buyer": buyer, "deal": deal})
         return result
     return render_template(request, "requests.html", db,
                            sent=enrich(sent), received=enrich(received))
+
+
+
+
+# ═══════════════════════════════════════════
+#  STAGE 3 — DEAL ROOM
+# ═══════════════════════════════════════════
+
+PREDEFINED_QUESTIONS = [
+    ("shipping",   "Can this artwork be shipped to my location?"),
+    ("dimensions", "What are the exact dimensions of this artwork?"),
+    ("framing",    "Is framing included with this artwork?"),
+    ("condition",  "What is the current condition of the artwork?"),
+    ("photos",     "Can you share additional photos of this artwork?"),
+    ("original",   "Is this the original artwork or a print?"),
+    ("other",      "I have a custom question (see message below)."),
+]
+
+PREDEFINED_ANSWERS = [
+    "Shipping is available.",
+    "Shipping is not available.",
+    "Framing is included.",
+    "Framing is not included.",
+    "Dimensions are listed in the artwork description.",
+    "I can provide additional photos on request.",
+    "This is the original artwork.",
+    "This is a high-quality print.",
+]
+
+
+def _deal_access(deal: models.Deal, current_user: models.User) -> bool:
+    return current_user.id in (deal.buyer_id, deal.artist_id) or getattr(current_user, "is_admin", False)
 
 
 @app.post("/requests/{request_id}/accept")
@@ -1023,37 +1344,143 @@ def accept_buy_request(request_id: int, request: Request, db: Session = Depends(
     media = crud.get_media_item(db, req.media_id)
     if not media or media.uploader_id != current_user.id:
         raise HTTPException(status_code=403)
+    # Update request status
     crud.update_request_status(db, request_id, "accepted")
+    # Create deal room
+    deal = crud.get_deal_by_request(db, request_id)
+    if not deal:
+        deal = crud.create_deal(
+            db,
+            buy_request_id=request_id,
+            media_id=req.media_id,
+            buyer_id=req.buyer_id,
+            artist_id=current_user.id,
+            current_price=req.offer_price,
+            last_actor_id=req.buyer_id,
+        )
     crud.create_notification(db, user_id=req.buyer_id, actor_id=current_user.id, kind="request_accepted", media_id=req.media_id)
-    return redirect_with_flash("/requests", "Request accepted! The deal room will open in Stage 3.", "success")
+    return redirect_with_flash(f"/deal/{deal.id}", "Request accepted. Deal room is now open.", "success")
 
 
-@app.post("/requests/{request_id}/reject")
-def reject_buy_request(request_id: int, request: Request, db: Session = Depends(get_db)):
+@app.get("/deal/{deal_id}")
+def deal_room(deal_id: int, request: Request, db: Session = Depends(get_db)):
     current_user = get_current_user(request, db)
     if not current_user:
         return redirect_with_flash("/login", "Please sign in.", "info")
-    req = crud.get_buy_request(db, request_id)
-    if not req:
-        raise HTTPException(status_code=404)
-    media = crud.get_media_item(db, req.media_id)
-    if not media or media.uploader_id != current_user.id:
-        raise HTTPException(status_code=403)
-    crud.update_request_status(db, request_id, "rejected")
-    crud.create_notification(db, user_id=req.buyer_id, actor_id=current_user.id, kind="request_rejected", media_id=req.media_id)
-    return redirect_with_flash("/requests", "Request rejected.", "success")
+    deal = crud.get_deal(db, deal_id)
+    if not deal:
+        raise HTTPException(status_code=404, detail="Deal not found")
+    if not _deal_access(deal, current_user):
+        raise HTTPException(status_code=403, detail="Access denied")
+    media = crud.get_media_item(db, deal.media_id)
+    events = crud.get_deal_events(db, deal_id)
+    buyer = db.query(models.User).filter(models.User.id == deal.buyer_id).first()
+    artist = db.query(models.User).filter(models.User.id == deal.artist_id).first()
+    # Enrich events with actor usernames
+    enriched = []
+    for ev in events:
+        actor = db.query(models.User).filter(models.User.id == ev.actor_id).first()
+        enriched.append({"ev": ev, "actor": actor})
+    is_buyer = current_user.id == deal.buyer_id
+    return render_template(
+        request, "deal_room.html", db,
+        deal=deal,
+        media=media,
+        events=enriched,
+        buyer=buyer,
+        artist=artist,
+        is_buyer=is_buyer,
+        current_user=current_user,
+        predefined_questions=PREDEFINED_QUESTIONS,
+        predefined_answers=PREDEFINED_ANSWERS,
+    )
 
 
-@app.post("/requests/{request_id}/cancel")
-def cancel_buy_request(request_id: int, request: Request, db: Session = Depends(get_db)):
+@app.post("/deal/{deal_id}/offer")
+def deal_make_offer(deal_id: int, request: Request, amount: str = Form(...), message: str = Form(""), db: Session = Depends(get_db)):
     current_user = get_current_user(request, db)
-    if not current_user:
-        return redirect_with_flash("/login", "Please sign in.", "info")
-    req = crud.get_buy_request(db, request_id)
-    if not req or req.buyer_id != current_user.id:
+    deal = crud.get_deal(db, deal_id)
+    if not deal or not _deal_access(deal, current_user):
         raise HTTPException(status_code=403)
-    crud.update_request_status(db, request_id, "cancelled")
-    return redirect_with_flash("/requests", "Request cancelled.", "success")
+    if deal.status not in ("negotiating", "agreed"):
+        return redirect_with_flash(f"/deal/{deal_id}", "This deal is no longer in negotiation.", "info")
+    try:
+        price = int(amount.strip())
+        if price < 1:
+            raise ValueError
+    except ValueError:
+        return redirect_with_flash(f"/deal/{deal_id}", "Please enter a valid offer amount.", "error")
+    is_buyer = current_user.id == deal.buyer_id
+    kind = "offer" if is_buyer else "counter"
+    crud.update_deal(db, deal, current_price=price, status="negotiating", last_actor_id=current_user.id)
+    crud.add_deal_event(db, deal_id, current_user.id, kind, amount=price, message=message.strip()[:200] or None)
+    other_id = deal.artist_id if is_buyer else deal.buyer_id
+    crud.create_notification(db, user_id=other_id, actor_id=current_user.id, kind="deal_offer", media_id=deal.media_id)
+    return redirect_with_flash(f"/deal/{deal_id}", "Offer sent.", "success")
+
+
+@app.post("/deal/{deal_id}/accept-price")
+def deal_accept_price(deal_id: int, request: Request, db: Session = Depends(get_db)):
+    current_user = get_current_user(request, db)
+    deal = crud.get_deal(db, deal_id)
+    if not deal or not _deal_access(deal, current_user):
+        raise HTTPException(status_code=403)
+    if deal.status not in ("negotiating",):
+        return redirect_with_flash(f"/deal/{deal_id}", "Nothing to accept.", "info")
+    crud.update_deal(db, deal, status="agreed")
+    crud.add_deal_event(db, deal_id, current_user.id, "accept_price", message=f"₹{deal.current_price:,} accepted.")
+    other_id = deal.artist_id if current_user.id == deal.buyer_id else deal.buyer_id
+    crud.create_notification(db, user_id=other_id, actor_id=current_user.id, kind="deal_agreed", media_id=deal.media_id)
+    return redirect_with_flash(f"/deal/{deal_id}", "Price accepted! You can now create the deal receipt.", "success")
+
+
+@app.post("/deal/{deal_id}/question")
+def deal_ask_question(deal_id: int, request: Request, question_key: str = Form(""), custom_message: str = Form(""), db: Session = Depends(get_db)):
+    current_user = get_current_user(request, db)
+    deal = crud.get_deal(db, deal_id)
+    if not deal or not _deal_access(deal, current_user):
+        raise HTTPException(status_code=403)
+    if deal.status == "cancelled":
+        return redirect_with_flash(f"/deal/{deal_id}", "This deal is cancelled.", "info")
+    # Find predefined question text
+    q_text = next((q[1] for q in PREDEFINED_QUESTIONS if q[0] == question_key), None)
+    message = q_text if q_text and question_key != "other" else custom_message.strip()[:200]
+    if not message:
+        return redirect_with_flash(f"/deal/{deal_id}", "Please enter a question.", "error")
+    crud.add_deal_event(db, deal_id, current_user.id, "question", message=message)
+    other_id = deal.artist_id if current_user.id == deal.buyer_id else deal.buyer_id
+    crud.create_notification(db, user_id=other_id, actor_id=current_user.id, kind="deal_question", media_id=deal.media_id)
+    return redirect_with_flash(f"/deal/{deal_id}", "Question sent.", "success")
+
+
+@app.post("/deal/{deal_id}/answer")
+def deal_answer(deal_id: int, request: Request, answer_text: str = Form(""), custom_answer: str = Form(""), db: Session = Depends(get_db)):
+    current_user = get_current_user(request, db)
+    deal = crud.get_deal(db, deal_id)
+    if not deal or not _deal_access(deal, current_user):
+        raise HTTPException(status_code=403)
+    message = answer_text.strip() if answer_text.strip() else custom_answer.strip()[:200]
+    if not message:
+        return redirect_with_flash(f"/deal/{deal_id}", "Please enter an answer.", "error")
+    crud.add_deal_event(db, deal_id, current_user.id, "answer", message=message)
+    other_id = deal.artist_id if current_user.id == deal.buyer_id else deal.buyer_id
+    crud.create_notification(db, user_id=other_id, actor_id=current_user.id, kind="deal_answer", media_id=deal.media_id)
+    return redirect_with_flash(f"/deal/{deal_id}", "Answer sent.", "success")
+
+
+@app.post("/deal/{deal_id}/cancel")
+def deal_cancel(deal_id: int, request: Request, db: Session = Depends(get_db)):
+    current_user = get_current_user(request, db)
+    deal = crud.get_deal(db, deal_id)
+    if not deal or not _deal_access(deal, current_user):
+        raise HTTPException(status_code=403)
+    if deal.status in ("completed", "cancelled"):
+        return redirect_with_flash(f"/deal/{deal_id}", "Deal is already closed.", "info")
+    crud.update_deal(db, deal, status="cancelled")
+    crud.add_deal_event(db, deal_id, current_user.id, "cancel", message="Deal cancelled.")
+    other_id = deal.artist_id if current_user.id == deal.buyer_id else deal.buyer_id
+    crud.create_notification(db, user_id=other_id, actor_id=current_user.id, kind="deal_cancelled", media_id=deal.media_id)
+    return redirect_with_flash("/requests", "Deal cancelled.", "success")
 
 
 @app.get("/api/media", response_model=list[schemas.MediaRead])

@@ -18,7 +18,13 @@
       <p>{{ media.description or 'No description available for this item.' }}</p>
 
       <!-- Sale status -->
-      {% if media.sale_status == 'fixed' and media.fixed_price %}
+      {% if media.artwork_status == 'sold' %}
+        <div class="watch-price-block">
+          <div class="price-tag artwork-sold-tag" style="font-size:1rem;padding:8px 16px">
+            <i class="fas fa-circle-check"></i> Sold · ₹{{ "{:,}".format(media.fixed_price) if media.fixed_price else 'Deal confirmed' }}
+          </div>
+        </div>
+      {% elif media.sale_status == 'fixed' and media.fixed_price %}
         <div class="watch-price-block">
           <div class="price-tag price-fixed" style="font-size:1rem;padding:8px 16px">
             <i class="fas fa-tag"></i> ₹{{ "{:,}".format(media.fixed_price) }} — Fixed Price
@@ -68,6 +74,25 @@
         {% endif %}
       </div>
       <a class="button" href="/browse">Browse more media</a>
+      {% if current_user and (current_user.id == media.uploader_id or current_user.is_admin) %}
+      <div style="display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap">
+        {% if current_user.id == media.uploader_id %}
+          <a href="/media/{{ media.id }}/edit" class="button">Edit</a>
+          {% if media.artwork_status == 'reserved' %}
+            <form action="/media/{{ media.id }}/mark-sold" method="post"
+                  onsubmit="return confirm('Mark this artwork as sold? This cannot be undone.')">
+              <button type="submit" class="button" style="background:#276749;color:#fff">
+                <i class="fas fa-circle-check"></i> Mark as Sold
+              </button>
+            </form>
+          {% endif %}
+        {% endif %}
+        <form action="/media/{{ media.id }}/delete" method="post"
+              onsubmit="return confirm('Delete this item permanently?')">
+          <button type="submit" class="button button-danger">Delete</button>
+        </form>
+      </div>
+      {% endif %}
     </div>
   </div>
 

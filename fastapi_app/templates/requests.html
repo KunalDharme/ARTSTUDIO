@@ -53,7 +53,7 @@
                 <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
                   <form action="/requests/{{ item.req.id }}/accept" method="post" style="display:inline">
                     <button type="submit" class="button" style="background:#38a169;color:#fff;padding:6px 16px;font-size:0.85rem">
-                      <i class="fas fa-check"></i> Accept
+                      <i class="fas fa-check"></i> Accept & Open Deal Room
                     </button>
                   </form>
                   <form action="/requests/{{ item.req.id }}/reject" method="post" style="display:inline"
@@ -65,9 +65,9 @@
                 </div>
               {% elif item.req.status == 'accepted' %}
                 <div style="margin-top:10px">
-                  <span style="color:#38a169;font-size:0.85rem;font-weight:600">
-                    <i class="fas fa-circle-check"></i> Accepted — Deal Room coming in next update
-                  </span>
+                  <a href="/deal/{{ item.deal.id if item.deal else '#' }}" class="button" style="background:#38a169;color:#fff;padding:6px 16px;font-size:0.85rem;display:inline-flex;align-items:center;gap:6px">
+                    <i class="fas fa-door-open"></i> Open Deal Room
+                  </a>
                 </div>
               {% endif %}
             </div>
@@ -124,10 +124,11 @@
                   </button>
                 </form>
               {% elif item.req.status == 'accepted' %}
-                <div style="margin-top:10px">
-                  <span style="color:#38a169;font-size:0.85rem;font-weight:600">
-                    <i class="fas fa-circle-check"></i> Accepted — Deal Room opening soon
-                  </span>
+                <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                  <a href="/deal/{{ item.deal.id if item.deal else '#' }}" class="button"
+                     style="background:#38a169;color:#fff;padding:6px 16px;font-size:0.85rem;display:inline-flex;align-items:center;gap:6px">
+                    <i class="fas fa-door-open"></i> Open Deal Room
+                  </a>
                 </div>
               {% endif %}
             </div>
