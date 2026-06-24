@@ -19,26 +19,6 @@ from jinja2 import Environment, FileSystemLoader
 from . import crud, models, schemas
 from .database import SessionLocal, engine, init_db
 from werkzeug.utils import secure_filename
-import cloudinary
-import cloudinary.uploader
-
-cloudinary.config(
-    cloud_name=os.environ.get("CLOUDINARY_CLOUD_NAME"),
-    api_key=os.environ.get("CLOUDINARY_API_KEY"),
-    api_secret=os.environ.get("CLOUDINARY_API_SECRET"),
-)
-
-
-def _upload_file(file_bytes: bytes, filename: str, resource_type: str = "image") -> str:
-    """Upload file bytes to Cloudinary and return the secure URL."""
-    result = cloudinary.uploader.upload(
-        file_bytes,
-        public_id=os.path.splitext(filename)[0],
-        resource_type=resource_type,
-        overwrite=False,
-        unique_filename=True,
-    )
-    return result["secure_url"]
 
 # Simple JWT settings (keep secret safe in env for production)
 SECRET_KEY = os.environ.get("FASTAPI_SECRET_KEY", "change-me-please")
@@ -313,11 +293,14 @@ async def upload_media(
     if not filename:
         raise HTTPException(status_code=400, detail="Invalid file name.")
 
-    stored_file = _upload_file(
-        file_bytes,
-        filename,
-        resource_type="video" if content_type.startswith("video/") else "image"
-    )
+    save_path = os.path.join(UPLOAD_DIR, filename)
+    if os.path.exists(save_path):
+        root, ext = os.path.splitext(filename)
+        filename = f"{root}-{int(os.path.getmtime(save_path))}{ext}"
+        save_path = os.path.join(UPLOAD_DIR, filename)
+
+    with open(save_path, "wb") as buffer:
+        buffer.write(file_bytes)
 
     # Parse prices — store as integer rupees
     def _parse_price(val: str) -> int | None:
@@ -339,7 +322,7 @@ async def upload_media(
         min_price=_parse_price(min_price) if sale_status == "negotiable" else None,
         max_price=_parse_price(max_price) if sale_status == "negotiable" else None,
     )
-    crud.create_media_item(db, media, stored_file, uploader_id=current_user.id)
+    crud.create_media_item(db, media, filename, uploader_id=current_user.id)
     return redirect_with_flash("/browse", "Your media was uploaded successfully!", "success")
 
 

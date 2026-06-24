@@ -1,8 +1,8 @@
-# Aart Studio
+# Art Studio
 
 ## Overview
 
-Aart Studio is a FastAPI web application that was developed incrementally using VS Code and GitHub Copilot.
+Art Studio is a FastAPI web application that was developed incrementally using VS Code and GitHub Copilot.
 
 The project is currently functional and starts with:
 
