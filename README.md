@@ -1,25 +1,16 @@
-# AartStudio
+# ArtStudio
 
-`AartStudio` is a FastAPI-powered media portal for uploading and browsing photos and videos.
+`ArtStudio` is a FastAPI-powered media portal for uploading and browsing photos and videos related art. Where you can buy or sell your art.
 
-## Run locally
-
-```bash
-cd aartstudio
-..\venv\Scripts\activate  # Windows
-pip install -r ..\requirements.txt
-uvicorn aartstudio.main:app --reload
-```
-
-Open `http://127.0.0.1:8000` in your browser.
+The site is live at https://....
 
 ## Features
 
 - Upload image or MP4/WebM video files
 - Browse media with tag filters and pagination
 - Watch video files and view uploaded photos
-- SQLite database backend with SQLAlchemy
+- Buy or Sell your art work 
 
 ## Notes
 
-The main FastAPI app package is in `aartstudio/fastapi_app` after the move.
+This Platform is not only for profetional artist. Individual curis about art can also share this artwork and sell the art.
