@@ -1,16 +1,46 @@
-# ArtStudio
+# 🎨 ArtStudio
 
-`ArtStudio` is a FastAPI-powered media portal for uploading and browsing photos and videos related art. Where you can buy or sell your art.
+**ArtStudio** is a modern web platform for discovering, sharing, buying, and selling artwork.
 
-The site is live at https://https://web-production-abc65.up.railway.app/
+Built with **FastAPI**, ArtStudio allows creators and art enthusiasts to upload visual content, showcase their work, explore creations from others, and connect through a simple digital marketplace.
 
-## Features
+🌐 **Live Application:**
+https://web-production-abc65.up.railway.app/
 
-- Upload image or MP4/WebM video files
-- Browse media with tag filters and pagination
-- Watch video files and view uploaded photos
-- Buy or Sell your art work 
+---
 
-## Notes
+## ✨ Features
 
-This Platform is not only for profetional artist. Individual curis about art can also share this artwork and sell the art.
+* Upload and showcase artwork through images and videos
+* Support for image and MP4/WebM media
+* Browse content with tags and pagination
+* View media directly inside the platform
+* Buy and sell artwork
+* Discover creations from independent artists and hobby creators
+
+---
+
+## 🎯 Who is this for?
+
+ArtStudio is designed for everyone — not only professional artists.
+
+Whether you're:
+
+* A professional creator
+* A hobby artist
+* A student exploring creativity
+* Someone curious about art and visual expression
+
+You can share your work, explore inspiration, and connect through art.
+
+---
+
+## 🛠 Tech Stack
+
+*To be added*
+
+---
+
+## Status
+
+Live and actively maintained as a personal project.
