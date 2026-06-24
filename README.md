@@ -2,7 +2,7 @@
 
 `ArtStudio` is a FastAPI-powered media portal for uploading and browsing photos and videos related art. Where you can buy or sell your art.
 
-The site is live at https://....
+The site is live at https://https://web-production-abc65.up.railway.app/
 
 ## Features
 
