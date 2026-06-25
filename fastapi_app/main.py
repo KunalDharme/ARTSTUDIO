@@ -20,28 +20,46 @@ from . import crud, models, schemas
 from .database import SessionLocal, engine, init_db
 from werkzeug.utils import secure_filename
 
-# Simple JWT settings (keep secret safe in env for production)
-SECRET_KEY = os.environ.get("FASTAPI_SECRET_KEY", "change-me-please")
+# ── Secret Key ───────────────────────────────────────
+_raw_secret = os.environ.get("FASTAPI_SECRET_KEY", "")
+if not _raw_secret:
+    import secrets as _s
+    _raw_secret = _s.token_hex(32)
+    print("[WARNING] FASTAPI_SECRET_KEY not set. Sessions will reset on restart.")
+SECRET_KEY = _raw_secret
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
+# ── Upload directory ─────────────────────────────────
+# On Railway: mount a Volume at /data and files persist across redeploys
+# Locally: uses fastapi_app/uploads/ as before
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
+UPLOAD_DIR = os.environ.get("UPLOAD_DIR", os.path.join(BASE_DIR, "uploads"))
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-ALLOWED_PHOTO_TYPES = {"image/png", "image/jpeg", "image/gif"}
+
+ALLOWED_PHOTO_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
 ALLOWED_VIDEO_TYPES = {"video/mp4", "video/webm"}
 PAGE_SIZE = 12
 
 init_db()
 
-app = FastAPI(title="FastAPI Media Portal")
+app = FastAPI(title="ArtStudio")
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 template_dir = os.path.join(BASE_DIR, "templates")
-templates = Jinja2Templates(
-    env=Environment(loader=FileSystemLoader(template_dir), cache_size=0),
-)
+_jinja_env = Environment(loader=FileSystemLoader(template_dir), cache_size=0)
+
+def _media_url(filename_or_url: str) -> str:
+    """Return URL for a media file. Handles both local filenames and full URLs."""
+    if not filename_or_url:
+        return ""
+    if filename_or_url.startswith("http"):
+        return filename_or_url
+    return f"/uploads/{filename_or_url}"
+
+_jinja_env.globals["media_url"] = _media_url
+templates = Jinja2Templates(env=_jinja_env)
 
 
 @app.exception_handler(StarletteHTTPException)
